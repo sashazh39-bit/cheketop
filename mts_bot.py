@@ -95,7 +95,7 @@ except Exception:
 # Токен: на VPS — зашитый (prod mts-bot). На Render — из env TELEGRAM_BOT_TOKEN
 # (preview @oddsiso_bot), чтобы не было второго поллера прод-токена.
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or "9003512034:AAHtnt0lEMEAO2f99mS6fLwRv0bkOb9C8kc"
-ADMIN_ID = 7076663447
+ADMIN_ID = 1445265832
 DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mts_bot_data.json")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
