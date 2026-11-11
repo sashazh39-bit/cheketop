@@ -696,9 +696,8 @@ _BANK_MENU_BUTTONS = {
         [(u"\U0001f9fe Чек СБП", "ck_tbank_sbp")],
     ],
     "rocket": [
-        [(u"\U0001f9fe Чек СБП", "ck_rocket_sbp")],
-        [(u"\U0001f4b3 По карте", "ck_rocket_card")],
-        [(u"\U0001f4c4 Выписка", "ck_rocket_stmt")],
+        [(u"\U0001f4c4 Выписка", "ck_rocket_stmt"),
+         (u"\U0001f9fe Чек", "ck_rocket_new")],
     ],
     "rshb": [
         [(u"\U0001f9fe Чек СБП", "new_rshb")],
@@ -2480,16 +2479,28 @@ async def cb_vtbcard_acc(cb: CallbackQuery):
 
 
 # ── РОКЕТ: хендлеры (ck_rocket_sbp / ck_rocket_card) ──
+@router.callback_query(F.data == "ck_rocket_new")
+async def cb_ck_rocket_new(cb: CallbackQuery):
+    """Вход в режим Чек: выбор СБП / Карта — как переключатель в DocumentsPage."""
+    uid = cb.from_user.id
+    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    sessions[uid] = {"step": "rk_chek_layout", "mid": cb.message.message_id}
+    await edit(cb,
+        "\U0001f680 <b>Рокетбанк — Чек</b>\n\nВыбери тип:",
+        kb([(u"\U0001f9fe СБП", "ck_rocket_sbp"), (u"\U0001f4b3 Карта", "ck_rocket_card")],
+           [(u"\u2b05 В банк", "bankmenu:rocket")]), uid)
+    await cb.answer()
+
+
 @router.callback_query(F.data == "ck_rocket_sbp")
 async def cb_ck_rocket_sbp(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid): await cb.answer("Нет доступа"); return
     sessions[uid] = {"step": "ck_rocket_sbp_name", "mid": cb.message.message_id, "ck_flow": "ck_rocket_sbp"}
     await edit(cb,
-        "\U0001f680 <b>Рокетбанк СБП</b>\n\n"
-        "\U0001f464 <b>ФИО отправителя (Рокет):</b>\n"
-        "Например: <code>Иванов Иван Иванович</code>",
-        kb([(u"\u2b05 В банк", "bankmenu:rocket")], [(u"\u274c Отмена", "cancel")]), uid)
+        "\U0001f680 <b>Чек Рокет — СБП</b>\n\n"
+        "\U0001f4b0 <b>Сумма (рубли):</b>\nНапример: <code>5000</code>",
+        kb([(u"\u274c Отмена", "cancel")]), uid)
     await cb.answer()
 
 
@@ -2499,10 +2510,9 @@ async def cb_ck_rocket_card(cb: CallbackQuery):
     if not is_ok(uid): await cb.answer("Нет доступа"); return
     sessions[uid] = {"step": "ck_rocket_card_name", "mid": cb.message.message_id, "ck_flow": "ck_rocket_card"}
     await edit(cb,
-        "\U0001f680 <b>Рокетбанк — перевод по карте</b>\n\n"
-        "\U0001f464 <b>ФИО отправителя (Рокет):</b>\n"
-        "Например: <code>Иванов Иван Иванович</code>",
-        kb([(u"\u2b05 В банк", "bankmenu:rocket")], [(u"\u274c Отмена", "cancel")]), uid)
+        "\U0001f680 <b>Чек Рокет — По карте</b>\n\n"
+        "\U0001f4b0 <b>Сумма (рубли):</b>\nНапример: <code>5000</code>",
+        kb([(u"\u274c Отмена", "cancel")]), uid)
     await cb.answer()
 
 
@@ -2517,12 +2527,14 @@ async def _rocket_sbp_finish(msg_or_cb, uid):
         if recip and not recip.endswith("."): recip += "."
         amount = int(s.get("rk_amount", 0))
         bank = s.get("rk_bank", "Сбербанк")
-        ph_s = format_phone(s.get("rk_phone_s", "")) or f"+7 9{random.randint(10,99)} {random.randint(100,999)}-{random.randint(10,99)}-{random.randint(10,99)}"
-        ph_r = format_phone(s.get("rk_phone_r", "")) or f"+7 9{random.randint(10,99)} {random.randint(100,999)}-{random.randint(10,99)}-{random.randint(10,99)}"
+        ph_s = s.get("rk_sender_phone") or f"+7 9{random.randint(10,99)} {random.randint(100,999)}-{random.randint(10,99)}-{random.randint(10,99)}"
+        ph_r = s.get("rk_recip_phone") or f"+7 9{random.randint(10,99)} {random.randint(100,999)}-{random.randint(10,99)}-{random.randint(10,99)}"
+        op_dt = s.get("rk_dt") or now_msk()
         pdf = await run_gen(ck().gen_rocket_sbp,
                             sender_name=sender, sender_phone=ph_s,
                             recipient_name=recip, recipient_phone=ph_r,
-                            recipient_bank=bank, amount=amount)
+                            recipient_bank=bank, amount=amount,
+                            operation_dt=op_dt)
     except Exception as e:
         await _clear_note(qmsg)
         await bot.send_message(uid, f"\u274c Ошибка Рокет СБП: <code>{html.escape(str(e))[:300]}</code>", reply_markup=main_menu(uid))
@@ -2532,7 +2544,7 @@ async def _rocket_sbp_finish(msg_or_cb, uid):
     await bot.send_document(uid, BufferedInputFile(pdf, filename=fn),
         caption=(f"\U0001f680 Рокетбанк СБП \u2022 {amount} ₽\n"
                  f"\U0001f464 {sender}\n\U0001f464 {recip} ({bank})"),
-        reply_markup=kb([(u"\U0001f504 Ещё", "ck_rocket_sbp")], [(u"\U0001f3e0 Меню", "home")]))
+        reply_markup=kb([(u"\U0001f504 Ещё чек", "ck_rocket_new")], [(u"\U0001f3e0 Меню", "home")]))
     if gfeat("log_all_banks"):
         data["logs"].append({"uid": uid, "type": "rocket_sbp", "amount": amount, "ts": now_msk().isoformat()})
 
@@ -2546,10 +2558,12 @@ async def _rocket_card_finish(msg_or_cb, uid):
         if sender and not sender.endswith("."): sender += "."
         amount = int(s.get("rk_amount", 0))
         card = s.get("rk_card", f"2200 **** **** {random.randint(1000,9999)}")
-        bank = s.get("rk_bank") or None
+        bank = s.get("rk_card_bank") or None
+        op_dt = s.get("rk_dt") or now_msk()
         pdf = await run_gen(ck().gen_rocket_card,
                             sender_name=sender, recipient_card=card,
-                            recipient_bank=bank, amount=amount)
+                            recipient_bank=bank, amount=amount,
+                            operation_dt=op_dt)
     except Exception as e:
         await _clear_note(qmsg)
         await bot.send_message(uid, f"\u274c Ошибка Рокет карта: <code>{html.escape(str(e))[:300]}</code>", reply_markup=main_menu(uid))
@@ -2559,7 +2573,7 @@ async def _rocket_card_finish(msg_or_cb, uid):
     await bot.send_document(uid, BufferedInputFile(pdf, filename=fn),
         caption=(f"\U0001f680 Рокетбанк карта \u2022 {amount} ₽\n"
                  f"\U0001f464 {sender}\n\U0001f4b3 {card}"),
-        reply_markup=kb([(u"\U0001f504 Ещё", "ck_rocket_card")], [(u"\U0001f3e0 Меню", "home")]))
+        reply_markup=kb([(u"\U0001f504 Ещё чек", "ck_rocket_new")], [(u"\U0001f3e0 Меню", "home")]))
 
 # ── MERGE ЧЕКЕТОП (вариант А): Альфа/Т-Банк + ВТБ на движке чекетоп ──
 _CK_PAYERS = ["Александр Евгеньевич Ж.", "Денис Викторович П.",
@@ -3883,73 +3897,129 @@ async def handle_text(msg: Message):
         await edit(msg, _rk_stmt_ops_text(s), _rk_stmt_ops_menu(s), uid); return
 
     # ── РОКЕТ текстовые шаги ──
-    if s["step"] in ("ck_rocket_sbp_name", "ck_rocket_card_name"):
-        flow = s.get("ck_flow", "")
-        name = bank_name(msg.text.strip())
-        if not name:
-            await edit(msg, "\u274c Имя не может быть пустым.\nНапример: <code>Иванов Иван Иванович</code>",
-                       kb([(u"\u274c Отмена", "cancel")]), uid); return
-        s["rk_sender"] = name
-        if flow == "ck_rocket_card":
-            s["step"] = "ck_rocket_card_amount"
-            await edit(msg,
-                f"\U0001f464 Отправитель: <b>{name}</b> \u2705\n\n"
-                "\U0001f4b0 <b>Сумма (рубли):</b>\nНапример: <code>5000</code>",
-                kb([(u"\u274c Отмена", "cancel")]), uid); return
-        # SBP: получатель
-        s["step"] = "ck_rocket_sbp_recip"
-        await edit(msg,
-            f"\U0001f464 Отправитель: <b>{name}</b> \u2705\n\n"
-            "\U0001f464 <b>ФИО получателя:</b>\nНапример: <code>Петров Пётр Петрович</code>",
-            kb([(u"\u274c Отмена", "cancel")]), uid); return
-
-    if s["step"] == "ck_rocket_sbp_recip":
-        name = bank_name(msg.text.strip())
-        if not name:
-            await edit(msg, "\u274c Пустое имя.\nНапример: <code>Петров Пётр Петрович</code>",
-                       kb([(u"\u274c Отмена", "cancel")]), uid); return
-        s["rk_recip"] = name
-        s["step"] = "ck_rocket_sbp_bank"
-        await edit(msg,
-            f"\U0001f464 Получатель: <b>{name}</b> \u2705\n\n"
-            "\U0001f3e6 <b>Банк получателя:</b>\nНапример: <code>Сбербанк</code>",
-            kb([(u"\U0001f3b2 Случайный", "rk_bank_auto")], [(u"\u274c Отмена", "cancel")]), uid); return
-
-    if s["step"] == "ck_rocket_sbp_bank":
-        s["rk_bank"] = msg.text.strip() or "Сбербанк"
-        s["step"] = "ck_rocket_sbp_amount"
-        await edit(msg,
-            f"\U0001f3e6 Банк: <b>{s['rk_bank']}</b> \u2705\n\n"
-            "\U0001f4b0 <b>Сумма (рубли):</b>\nНапример: <code>5000</code>",
-            kb([(u"\u274c Отмена", "cancel")]), uid); return
-
-    if s["step"] in ("ck_rocket_sbp_amount", "ck_rocket_card_amount"):
+    # РОКЕТ ЧЕК: шаги по полям как в DocumentsPage (Сумма → Дата/Время → Отправитель → ...)
+    if s["step"] == "ck_rocket_sbp_name":  # первый шаг = сумма (flow для sbp)
         t = str(_parse_rub_amount(msg.text) or "")
         if not t or int(t) <= 0 or int(t) > 999999:
             await edit(msg, "\u274c Введи сумму от 1 до 999 999, например: <code>5000</code>",
                        kb([(u"\u274c Отмена", "cancel")]), uid); return
         s["rk_amount"] = int(t)
-        if s.get("ck_flow") == "ck_rocket_card":
-            s["step"] = "ck_rocket_card_card"
-            r = "".join([str(__import__("random").randint(0,9)) for _ in range(4)])
-            await edit(msg,
-                f"\U0001f4b0 {int(t):,} ₽ \u2705\n\n"
-                "\U0001f4b3 <b>Маска карты получателя:</b>\n"
-                "Например: <code>2200 **** **** 9515</code>",
-                kb([(f"2200 **** **** {r}", f"rk_card:{r}")], [(u"\u274c Отмена", "cancel")]), uid); return
+        s["step"] = "ck_rocket_sbp_dt"
+        from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+        now_msk_str = _dt.now(_tz(_td(hours=3))).strftime("%d.%m.%Y %H:%M")
+        await edit(msg,
+            f"\U0001f4b0 {int(t):,} ₽ \u2705\n\n"
+            "\U0001f551 <b>Дата и время (МСК):</b>\n"
+            f"Например: <code>{now_msk_str}</code>",
+            kb([(u"\U0001f552 Сейчас", "rk_chek_dt_now")], [(u"\u274c Отмена", "cancel")]), uid); return
+
+    if s["step"] == "ck_rocket_sbp_dt":
+        import re as _re, datetime as _dtt
+        m = _re.match(r"(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2})", msg.text.strip())
+        if not m:
+            await edit(msg, "\u274c Формат: <code>ДД.ММ.ГГГГ ЧЧ:ММ</code>",
+                       kb([(u"\u274c Отмена","cancel")]), uid); return
+        day, hm = m.group(1), m.group(2)
+        dp = day.split(".")
+        s["rk_dt"] = _dtt.datetime.strptime(f"{dp[2]}-{dp[1]}-{dp[0]} {hm}", "%Y-%m-%d %H:%M")
+        s["step"] = "ck_rocket_sbp_sender"
+        await edit(msg,
+            f"\U0001f551 {day} {hm} \u2705\n\n"
+            "\U0001f464 <b>ФИО отправителя (счёт Рокет):</b>\nНапример: <code>Иванов Иван Иванович</code>",
+            kb([(u"\u274c Отмена","cancel")]), uid); return
+
+    if s["step"] == "ck_rocket_sbp_sender":
+        name = bank_name(msg.text.strip())
+        if not name: await edit(msg, "\u274c Пустое имя.", kb([(u"\u274c Отмена","cancel")]), uid); return
+        s["rk_sender"] = name
+        s["step"] = "ck_rocket_sbp_sender_phone"
+        await edit(msg,
+            f"\U0001f464 Отправитель: <b>{name}</b> \u2705\n\n"
+            "\U0001f4de <b>Телефон отправителя:</b>\nНапример: <code>+7 900 351-70-80</code>",
+            kb([(u"\U0001f3b2 Случайный", "rk_chek_sph_auto")], [(u"\u274c Отмена","cancel")]), uid); return
+
+    if s["step"] == "ck_rocket_sbp_sender_phone":
+        s["rk_sender_phone"] = format_phone(msg.text.strip()) or msg.text.strip()
+        s["step"] = "ck_rocket_sbp_recip"
+        await edit(msg,
+            "\U0001f464 <b>ФИО получателя:</b>\nНапример: <code>Петров Пётр Петрович</code>",
+            kb([(u"\u274c Отмена","cancel")]), uid); return
+
+    if s["step"] == "ck_rocket_sbp_recip":
+        name = bank_name(msg.text.strip())
+        if not name: await edit(msg, "\u274c Пустое имя.", kb([(u"\u274c Отмена","cancel")]), uid); return
+        s["rk_recip"] = name
+        s["step"] = "ck_rocket_sbp_recip_phone"
+        await edit(msg,
+            f"\U0001f464 Получатель: <b>{name}</b> \u2705\n\n"
+            "\U0001f4de <b>Телефон получателя:</b>\nНапример: <code>+7 963 297-20-08</code>",
+            kb([(u"\U0001f3b2 Случайный", "rk_chek_rph_auto")], [(u"\u274c Отмена","cancel")]), uid); return
+
+    if s["step"] == "ck_rocket_sbp_recip_phone":
+        s["rk_recip_phone"] = format_phone(msg.text.strip()) or msg.text.strip()
+        s["step"] = "ck_rocket_sbp_bank"
+        await edit(msg,
+            "\U0001f3e6 <b>Банк получателя:</b>\nНапример: <code>Сбербанк</code>",
+            kb([(u"\U0001f3b2 Случайный", "rk_bank_auto")], [(u"\u274c Отмена","cancel")]), uid); return
+
+    if s["step"] == "ck_rocket_sbp_bank":
+        s["rk_bank"] = msg.text.strip() or "Сбербанк"
         s["step"] = "gen_busy"
         await _rocket_sbp_finish(msg, uid); return
+
+    # КАРТА
+    if s["step"] == "ck_rocket_card_name":  # первый шаг card = сумма
+        t = str(_parse_rub_amount(msg.text) or "")
+        if not t or int(t) <= 0 or int(t) > 999999:
+            await edit(msg, "\u274c Введи сумму от 1 до 999 999", kb([(u"\u274c Отмена","cancel")]), uid); return
+        s["rk_amount"] = int(t)
+        s["step"] = "ck_rocket_card_dt"
+        from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+        now_str = _dt.now(_tz(_td(hours=3))).strftime("%d.%m.%Y %H:%M")
+        await edit(msg,
+            f"\U0001f4b0 {int(t):,} ₽ \u2705\n\n"
+            "\U0001f551 <b>Дата и время (МСК):</b>\nНапример: <code>{now_str}</code>",
+            kb([(u"\U0001f552 Сейчас", "rk_chek_dt_now")], [(u"\u274c Отмена","cancel")]), uid); return
+
+    if s["step"] == "ck_rocket_card_dt":
+        import re as _re, datetime as _dtt
+        m = _re.match(r"(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2})", msg.text.strip())
+        if not m:
+            await edit(msg, "\u274c Формат: <code>ДД.ММ.ГГГГ ЧЧ:ММ</code>", kb([(u"\u274c Отмена","cancel")]), uid); return
+        day, hm = m.group(1), m.group(2); dp = day.split(".")
+        s["rk_dt"] = _dtt.datetime.strptime(f"{dp[2]}-{dp[1]}-{dp[0]} {hm}", "%Y-%m-%d %H:%M")
+        s["step"] = "ck_rocket_card_sender"
+        await edit(msg,
+            f"\U0001f551 {day} {hm} \u2705\n\n"
+            "\U0001f464 <b>ФИО отправителя (счёт Рокет):</b>\nНапример: <code>Иванов Иван Иванович</code>",
+            kb([(u"\u274c Отмена","cancel")]), uid); return
+
+    if s["step"] == "ck_rocket_card_sender":
+        name = bank_name(msg.text.strip())
+        if not name: await edit(msg, "\u274c Пустое имя.", kb([(u"\u274c Отмена","cancel")]), uid); return
+        s["rk_sender"] = name
+        s["step"] = "ck_rocket_card_card"
+        r = f"{random.randint(1000,9999)}"
+        await edit(msg,
+            f"\U0001f464 Отправитель: <b>{name}</b> \u2705\n\n"
+            "\U0001f4b3 <b>Карта получателя:</b>\nНапример: <code>2200 **** **** 9515</code>",
+            kb([(f"2200 **** **** {r}", f"rk_card:{r}")], [(u"\u274c Отмена","cancel")]), uid); return
 
     if s["step"] == "ck_rocket_card_card":
         import re as _re
         raw = msg.text.strip()
         digits = _re.sub(r"\D","",raw)
-        if len(digits) == 4:
-            s["rk_card"] = f"2200 **** **** {digits}"
-        elif len(digits) >= 16:
-            s["rk_card"] = f"{digits[:4]} **** **** {digits[-4:]}"
-        else:
-            s["rk_card"] = raw or f"2200 **** **** {__import__('random').randint(1000,9999)}"
+        if len(digits) == 4: s["rk_card"] = f"2200 **** **** {digits}"
+        elif len(digits) >= 16: s["rk_card"] = f"{digits[:4]} **** **** {digits[-4:]}"
+        else: s["rk_card"] = raw or f"2200 **** **** {random.randint(1000,9999)}"
+        s["step"] = "ck_rocket_card_bank"
+        await edit(msg,
+            f"\U0001f4b3 {s['rk_card']} \u2705\n\n"
+            "\U0001f3e6 <b>Банк получателя</b> (необязательно):\n<code>Сбербанк</code> — или пропусти",
+            kb([(u"\u27a1 Без банка", "rk_card_nobank")], [(u"\u274c Отмена","cancel")]), uid); return
+
+    if s["step"] == "ck_rocket_card_bank":
+        s["rk_card_bank"] = msg.text.strip() or None
         s["step"] = "gen_busy"
         await _rocket_card_finish(msg, uid); return
 
@@ -6169,6 +6239,73 @@ async def cb_rk_stmt_op_phone_auto(cb: CallbackQuery):
     s["step"] = "rk_stmt_ops_menu"
     await edit(cb, _rk_stmt_ops_text(s), _rk_stmt_ops_menu(s), uid)
     await cb.answer("Добавлено ✓")
+
+
+@router.callback_query(F.data == "rk_chek_dt_now")
+async def cb_rk_chek_dt_now(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    s = sessions.get(uid)
+    if not s: await cb.answer("Начни заново"); return
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    s["rk_dt"] = _dt.now(_tz(_td(hours=3))).replace(tzinfo=None)
+    # Определяем следующий шаг по flow
+    flow = s.get("ck_flow","") or s.get("step","")
+    if "card" in flow or s["step"] == "ck_rocket_card_dt":
+        s["step"] = "ck_rocket_card_sender"
+        await edit(cb,
+            "\U0001f551 Сейчас (МСК) \u2705\n\n"
+            "\U0001f464 <b>ФИО отправителя (счёт Рокет):</b>\nНапример: <code>Иванов Иван Иванович</code>",
+            kb([(u"\u274c Отмена","cancel")]), uid)
+    else:
+        s["step"] = "ck_rocket_sbp_sender"
+        await edit(cb,
+            "\U0001f551 Сейчас (МСК) \u2705\n\n"
+            "\U0001f464 <b>ФИО отправителя (счёт Рокет):</b>\nНапример: <code>Иванов Иван Иванович</code>",
+            kb([(u"\u274c Отмена","cancel")]), uid)
+    await cb.answer()
+
+
+@router.callback_query(F.data == "rk_chek_sph_auto")
+async def cb_rk_chek_sph_auto(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    s = sessions.get(uid)
+    if not s: await cb.answer("Начни заново"); return
+    s["rk_sender_phone"] = f"+7 9{random.randint(10,99)} {random.randint(100,999)}-{random.randint(10,99)}-{random.randint(10,99)}"
+    s["step"] = "ck_rocket_sbp_recip"
+    await edit(cb,
+        "\U0001f4de Телефон отправителя задан \u2705\n\n"
+        "\U0001f464 <b>ФИО получателя:</b>\nНапример: <code>Петров Пётр Петрович</code>",
+        kb([(u"\u274c Отмена","cancel")]), uid)
+    await cb.answer()
+
+
+@router.callback_query(F.data == "rk_chek_rph_auto")
+async def cb_rk_chek_rph_auto(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    s = sessions.get(uid)
+    if not s: await cb.answer("Начни заново"); return
+    s["rk_recip_phone"] = f"+7 9{random.randint(10,99)} {random.randint(100,999)}-{random.randint(10,99)}-{random.randint(10,99)}"
+    s["step"] = "ck_rocket_sbp_bank"
+    await edit(cb,
+        "\U0001f4de Телефон получателя задан \u2705\n\n"
+        "\U0001f3e6 <b>Банк получателя:</b>\nНапример: <code>Сбербанк</code>",
+        kb([(u"\U0001f3b2 Случайный", "rk_bank_auto")], [(u"\u274c Отмена","cancel")]), uid)
+    await cb.answer()
+
+
+@router.callback_query(F.data == "rk_card_nobank")
+async def cb_rk_card_nobank(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    s = sessions.get(uid)
+    if not s: await cb.answer("Начни заново"); return
+    s["rk_card_bank"] = None
+    s["step"] = "gen_busy"
+    await cb.answer()
+    await _rocket_card_finish(cb, uid)
 
 @router.error()
 async def on_error(event):
