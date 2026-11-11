@@ -206,3 +206,40 @@ def gen_rocket_card(*,
         output_path=output_path,
     )
     return path.read_bytes()
+
+
+def gen_rocket_statement(*,
+    holder_name: str,
+    period_start: str = "",
+    period_end: str = "",
+    opening_balance: str | int = "0",
+    operations: list | None = None,
+    account: str = "",
+    phone: str = "",
+    output_path=None,
+) -> bytes:
+    """Выписка Рокетбанк — generate_rocket_statement из rocket_lib/."""
+    import datetime as _dt
+    eng = _rocket()  # кэш rocket lib уже есть
+    from rocket_statement import generate_rocket_statement
+    today = _dt.date.today()
+    if not period_end:
+        period_end = today.strftime("%d.%m.%Y")
+    if not period_start:
+        period_start = (today - _dt.timedelta(days=6)).strftime("%d.%m.%Y")
+    ops = operations or []
+    path = generate_rocket_statement(
+        period_start=period_start,
+        period_end=period_end,
+        issue_date=period_end,
+        holder_name=holder_name,
+        account=account or None,
+        random_account_tail=not account,
+        opening_balance=str(opening_balance) if opening_balance else "0",
+        operations=ops,
+        operation_count=len(ops),
+        fill_random=False,
+        phone=phone or None,
+        output_path=output_path,
+    )
+    return path.read_bytes()
