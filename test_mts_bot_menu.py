@@ -90,7 +90,7 @@ class MenuSmoke(unittest.TestCase):
             "vtb": {"ck_vtb_sbp", "new_vtbcard", "home"},
             "alfa": {"ck_alfa_sbp", "home"},
             "tbank": {"ck_tbank_sbp", "home"},
-            "rocket": {"ck_rocket_stmt", "ck_rocket_new", "home"},
+            "rocket": {"rocket:sbp", "rocket:card", "rocket:stmt", "home", "cancel"},
             "rshb": {"new_rshb", "home"},
             # без флага ozon_v2 — старый flow (rollback)
             "ozon": {"new_ozon", "ozon_edit", "home"},

@@ -660,7 +660,7 @@ _BANK_MENU_TEXT = {
     "vtb":    u"\U0001f535 <b>ВТБ</b>\n\nВыбери действие:",
     "alfa":   u"\U0001f7e6 <b>Альфа-Банк</b>\n\nЧеки движком чекетоп. Выбери действие:",
     "tbank":  u"\U0001f7e8 <b>Т-Банк</b>\n\nЧеки движком чекетоп. Выбери действие:",
-    "rocket": u"\U0001f680 <b>Рокетбанк</b>\n\nВыбери действие:",
+    "rocket": u"\U0001f680 <b>Рокетбанк</b>. Что сформировать?",
     "rshb":   u"\U0001f33e <b>РСХБ (Россельхозбанк)</b>\n\nВыбери действие:",
     "ozon":   (u"\U0001f9fe <b>Озон Банк</b>\n\n"
                u"✅ <b>Для внешней проверки банком</b> — «✏️ Изменить сумму "
@@ -738,6 +738,15 @@ def bank_menu(bank_key, uid=None):
                 _row.sort(key=lambda b: 0 if b[1] == "oz:edit" else 1)
         rows.append([(u"\u2b05 Главное меню", "home")])
         return kb(*rows)
+    if bank_key == "rocket":
+        # Меню как в боте этого Мака: СБП / Карта / Выписка
+        return kb(*_rk2_rows2([
+            ("💸 Перевод по СБП", "rocket:sbp"),
+            ("💳 Перевод по номеру карты", "rocket:card"),
+            ("📄 Выписка", "rocket:stmt"),
+            ("🏠 Главное меню", "home"),
+            ("❌ Отмена", "cancel"),
+        ]))
     rows = [list(row) for row in _BANK_MENU_BUTTONS.get(bank_key, [])]
     rows.append([(u"\u2b05 Главное меню", "home")])
     return kb(*rows)
@@ -3632,6 +3641,10 @@ async def handle_text(msg: Message):
     try: await msg.delete()
     except: pass
 
+    if str(s.get("step") or "").startswith("rk2"):
+        await _rk2_handle_text(msg, uid, s)
+        return
+
     if s["step"] == "usr_login":
         login = msg.text.strip()
         if not re.match(r"^[A-Za-z0-9_.\-]{3,32}$", login):
@@ -6306,6 +6319,1722 @@ async def cb_rk_card_nobank(cb: CallbackQuery):
     s["step"] = "gen_busy"
     await cb.answer()
     await _rocket_card_finish(cb, uid)
+
+# ── РОКЕТ v2: флоу 1-в-1 как в боте этого Мака (yandex_bot.py) ────────────
+# Тексты, кнопки, порядок шагов, сводки и подписи — оттуда. Адаптация под
+# aiogram-сессии mts_bot (s["step"] с префиксом rk2_).
+
+ROCKET_SBP_BANK_OPTIONS = (
+    ("sber", "Сбербанк", "Сбербанк"),
+    ("tbank", "Т-Банк", "Т-Банк"),
+    ("vtb", "ВТБ", "ВТБ"),
+    ("alfa", "Альфа-Банк", "Альфа-Банк"),
+    ("ozon", "Ozon Банк (Озон)", "Озон Банк"),
+    ("wb", "Wildberries (Вайлдберриз Банк)", "Wildberries"),
+    ("psb", "ПСБ", "ПСБ"),
+    ("otp", "ОТП Банк", "ОТП Банк"),
+    ("mkb", "МКБ", "МКБ"),
+    ("sovcom", "Совкомбанк", "Совкомбанк"),
+    ("rosbank", "Росбанк", "Росбанк"),
+    ("gazprom", "Газпромбанк", "Газпромбанк"),
+)
+ROCKET_CARD_BANK_OPTIONS = (
+    ("sber", "Сбербанк", "Сбербанк"),
+    ("tbank", "Т-Банк", "Т-Банк"),
+    ("vtb", "ВТБ", "ВТБ"),
+    ("alfa", "Альфа-Банк", "Альфа-Банк"),
+    ("rosbank", "Росбанк", "Росбанк"),
+    ("sovcom", "Совкомбанк", "Совкомбанк"),
+    ("psb", "ПСБ", "ПСБ"),
+    ("otp", "ОТП Банк", "ОТП Банк"),
+    ("mkb", "МКБ", "МКБ"),
+    ("gazprom", "Газпромбанк", "Газпромбанк"),
+    ("ozon", "Ozon Банк (Озон)", "Озон Банк"),
+    ("wb", "Wildberries (в чеке без банка)", None),
+)
+ROCKET_DEFAULT_ACCOUNT_TAIL = "64892"
+ROCKET_MEM = {}  # uid -> {"sender": {...}, "recipient_sbp": {...}, "recipient_card": {...}}
+
+
+def _rk2_masked_account(account) -> str:
+    digits = re.sub(r"\D", "", str(account or ""))
+    tail = digits[-5:] if len(digits) >= 5 else ROCKET_DEFAULT_ACCOUNT_TAIL
+    return f"…{tail}"
+
+
+def _rk2_make_account(tail: str) -> str:
+    digits_tail = re.sub(r"\D", "", str(tail or ""))
+    if len(digits_tail) != 5:
+        raise ValueError("Хвост счёта должен быть из 5 цифр")
+    base = "4081781045023" + "13" + digits_tail
+    digits = list(base)
+    digits[8] = "0"
+    seq = "763" + "".join(digits)
+    weights = (7, 1, 3)
+    total = sum((int(ch) * weights[i % 3]) % 10 for i, ch in enumerate(seq))
+    key = ((total % 10) * 3) % 10
+    return base[:8] + str(key) + base[9:]
+
+
+def _rk2_random_account() -> str:
+    import secrets as _sec
+    tail = "".join(_sec.choice("0123456789") for _ in range(5))
+    return _rk2_make_account(tail)
+
+
+def _rk2_random_accounts(count: int = 3) -> list:
+    accounts = []
+    while len(accounts) < count:
+        acc = _rk2_random_account()
+        if acc not in accounts:
+            accounts.append(acc)
+    return accounts
+
+
+def _rk2_rows2(buttons):
+    return [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
+
+
+def _rk2_nav():
+    return [("⬅️ Назад", "rk2:back"), ("❌ Отмена", "cancel")]
+
+
+def _rk2_parse_name(text: str, who: str = "ФИО") -> str:
+    cleaned = " ".join((text or "").strip().split())
+    tokens = cleaned.split(" ") if cleaned else []
+    if len(tokens) < 2 or len(cleaned) > 100:
+        raise ValueError(f"Не похоже на {who}. Введите, например: Иванов Иван Иванович")
+    return cleaned
+
+
+def _rk2_parse_phone(text: str) -> str:
+    digits = re.sub(r"\D", "", text or "")
+    if len(digits) == 11 and digits.startswith("8"):
+        digits = "7" + digits[1:]
+    elif len(digits) == 10:
+        digits = "7" + digits
+    if len(digits) != 11 or not digits.startswith("7"):
+        raise ValueError("Не понял телефон. Введите, например: +7 900 351-70-80")
+    return f"+7 {digits[1:4]} {digits[4:7]}-{digits[7:9]}-{digits[9:11]}"
+
+
+def _rk2_parse_amount(text: str) -> str:
+    t = str(_parse_rub_amount(text) or "")
+    if not t:
+        raise ValueError(
+            "Не понял сумму. У Рокета сумма — только целые рубли. "
+            "Введите, например: 500, 1 000 или 10 000"
+        )
+    return f"{int(t):,}".replace(",", " ") + " ₽"
+
+
+def _rk2_current_time():
+    from datetime import timezone as _tz, timedelta as _td
+    return datetime.now(_tz(_td(hours=3))).replace(second=0, microsecond=0, tzinfo=None)
+
+
+# ── Промпты чека ─────────────────────────────────────────────────────────
+
+def _rk2_prompt(s: dict, step: str):
+    nav = [_rk2_nav()]
+    scenario = s.get("rk2_scenario")
+    mem = ROCKET_MEM.get(s.get("rk2_uid", 0), {})
+    if step == "rk2_rcpt_name":
+        rows = []
+        m = mem.get("recipient_sbp") or {}
+        if m.get("recipient_name"):
+            rows.append([(f"↩️ Оставить как в прошлый раз ({m['recipient_name']})", "rmem:recipient")])
+        rows += nav
+        return (
+            "👤 <b>Получатель.</b> Введите имя получателя.\n"
+            "Нажмите, чтобы скопировать: <code>Иванов Иван Иванович</code>\n"
+            "или как на чеке: <code>ИВАН ИВАНОВИЧ И</code>",
+            rows,
+        )
+    if step == "rk2_rcpt_phone":
+        return (
+            "📱 <b>Телефон получателя</b> в любом формате.\n"
+            "Нажмите, чтобы скопировать: <code>+7 900 351-70-80</code>",
+            nav,
+        )
+    if step == "rk2_rcpt_card":
+        rows = []
+        m = mem.get("recipient_card") or {}
+        if m.get("recipient_card"):
+            rows.append([(f"↩️ Оставить как в прошлый раз ({m['recipient_card']})", "rmem:recipient")])
+        rows += nav
+        return (
+            "💳 <b>Карта получателя.</b> Введите полные 16 цифр или маску.\n"
+            "Нажмите, чтобы скопировать: <code>2200 **** **** 9515</code>",
+            rows,
+        )
+    if step == "rk2_rcpt_bank":
+        options = ROCKET_CARD_BANK_OPTIONS if scenario == "rocket_card" else ROCKET_SBP_BANK_OPTIONS
+        buttons = [(label, f"rbank:{slug}") for slug, label, _v in options]
+        buttons.append(("✍️ Ввести свой", "rbank:custom"))
+        rows = _rk2_rows2(buttons) + nav
+        return ("🏦 <b>Банк получателя</b> — выберите кнопкой:", rows)
+    if step == "rk2_rcpt_bank_custom":
+        return (
+            "🏦 Введите название банка получателя.\n"
+            "Нажмите, чтобы скопировать: <code>Сбербанк</code>",
+            nav,
+        )
+    if step == "rk2_amount":
+        return (
+            "💰 <b>Сумма перевода.</b> Введите сумму сами — только целые "
+            "рубли, без копеек.\n"
+            "Нажмите, чтобы скопировать: <code>1000</code>",
+            nav,
+        )
+    if step == "rk2_sender_name":
+        rows = []
+        m = mem.get("sender") or {}
+        if m.get("sender_name"):
+            rows.append([(f"↩️ Оставить как в прошлый раз ({m['sender_name']})", "rmem:sender")])
+        rows += nav
+        return (
+            "👤 <b>Отправитель.</b> Введите ФИО отправителя.\n"
+            "Нажмите, чтобы скопировать: <code>Иванов Иван Иванович</code>",
+            rows,
+        )
+    if step == "rk2_sender_phone":
+        return (
+            "📱 <b>Телефон отправителя</b> в любом формате.\n"
+            "Нажмите, чтобы скопировать: <code>+7 900 351-70-80</code>",
+            nav,
+        )
+    if step == "rk2_sender_acc_choice":
+        candidates = _rk2_random_accounts(3)
+        s["rk2_acc_candidates"] = candidates
+        buttons = [
+            (f"🎲 Счёт {_rk2_masked_account(acc)}", f"rsacc:rand{i}")
+            for i, acc in enumerate(candidates)
+        ]
+        buttons += [
+            ("↩️ Оставить по умолчанию", "rsacc:default"),
+            ("✍️ Ввести свой целиком", "rsacc:custom"),
+        ]
+        rows = _rk2_rows2(buttons) + nav
+        return (
+            "💳 <b>Счёт отправителя.</b> Три случайных счёта собраны по "
+            "формуле счёта Рокета: основа и валюта — как у настоящих, "
+            "хвост случаен, контрольная цифра пересчитана. Выберите "
+            "кнопкой, оставьте счёт шаблона "
+            f"({_rk2_masked_account(None)}) или введите свой целиком.",
+            rows,
+        )
+    if step == "rk2_sender_acc_input":
+        return (
+            "💳 Введите счёт отправителя целиком — <b>20 цифр</b> "
+            "(подряд или группами по 5).",
+            nav,
+        )
+    if step == "rk2_time_choice":
+        rows = [[("🕒 Текущее время", "rtime:now"), ("✏️ Изменить время", "rtime:change")]] + nav
+        return ("🕒 <b>Время операции</b> — текущее или изменить?", rows)
+    if step == "rk2_time_input":
+        return (
+            "🕒 Введите время операции.\n"
+            "Нажмите, чтобы скопировать: <code>03.11.2026 16:26</code> "
+            "или только время <code>16:26</code> (= сегодня). "
+            "Секунды не нужны — движок подберёт их сам.",
+            nav,
+        )
+    # ── Промпты выписки ──
+    if step == "rk2s_period":
+        return (
+            "📅 <b>Период выписки.</b> Введите свой период.\n"
+            "Нажмите, чтобы скопировать: <code>16.10.2026–23.10.2026</code>",
+            nav,
+        )
+    if step == "rk2s_issue_choice":
+        rows = [[("📅 Сегодня", "sissue:today"), ("✍️ Ввести дату", "sissue:custom")]] + nav
+        return ("📅 <b>Дата выдачи выписки</b> — сегодня или ввести свою?", rows)
+    if step == "rk2s_issue_input":
+        return (
+            "📅 Введите дату выдачи.\n"
+            "Нажмите, чтобы скопировать: <code>03.11.2026</code>",
+            nav,
+        )
+    if step == "rk2s_holder":
+        return (
+            "👤 <b>ФИО держателя счёта.</b> Введите своё ФИО — движок "
+            "напечатает именно его; если буквы не хватит в глифах выписки, "
+            "движок честно откажет, а я покажу ошибку.\n"
+            "Нажмите, чтобы скопировать: <code>Иванов Иван Иванович</code>",
+            nav,
+        )
+    if step == "rk2s_phone":
+        return (
+            "📱 <b>Телефон владельца счёта</b> в любом формате.\n"
+            "Нажмите, чтобы скопировать: <code>+7 900 351-70-80</code>",
+            nav,
+        )
+    if step == "rk2s_acc_choice":
+        rows = _rk2_rows2([
+            ("↩️ Оставить текущий", "sacc:keep"),
+            ("🎲 Случайные последние 5 цифр", "sacc:random"),
+            ("✍️ Ввести последние 5", "sacc:tail"),
+            ("✍️ Ввести целиком", "sacc:full"),
+        ]) + nav
+        return (
+            "💳 <b>Счёт выписки.</b> Текущий заканчивается на "
+            f"{_rk2_masked_account(None)}; ключ при смене пересчитает движок.",
+            rows,
+        )
+    if step == "rk2s_acc_tail":
+        return (
+            "💳 Введите последние 5 цифр счёта.\n"
+            "Нажмите, чтобы скопировать: <code>12345</code>",
+            nav,
+        )
+    if step == "rk2s_acc_full":
+        return ("💳 Введите счёт целиком — <b>20 цифр</b>. Ключ пересчитает движок.", nav)
+    if step == "rk2s_opening":
+        return (
+            "💰 <b>Входящий остаток.</b> Копейки можно.\n"
+            "Нажмите, чтобы скопировать: <code>16,00</code>",
+            nav,
+        )
+    if step == "rk2s_count_choice":
+        buttons = [(str(n), f"scount:{n}") for n in range(0, 11)]
+        buttons.append(("✍️ Другое (0–10)", "scount:custom"))
+        rows = _rk2_rows2(buttons) + nav
+        return ("🔢 <b>Сколько платежей</b> в выписке (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)?", rows)
+    if step == "rk2s_count_input":
+        return (
+            "🔢 Введите число платежей от 0 до 10.\n"
+            "Нажмите, чтобы скопировать: <code>3</code>",
+            nav,
+        )
+    if step == "rk2s_source":
+        rows = _rk2_rows2([
+            ("📎 Загрузить чек PDF", "ssource:upload"),
+            ("🎲 Случайно по настоящим", "ssource:random"),
+            ("🧩 Смешанно", "ssource:mixed"),
+            ("✍️ Настроить", "ssource:manual"),
+        ]) + nav
+        return ("🧾 <b>Откуда платежи?</b>", rows)
+    if step == "rk2s_upload":
+        uploaded = len(s.get("rk2s_receipt_paths") or [])
+        total = int(s.get("rk2s_op_count") or 0)
+        rows = [[("✅ Готово", "stmt:uploads_done")]] + nav
+        return (
+            "📎 Загружайте чеки Рокета <b>PDF по одному</b>.\n"
+            f"Загружено чеков: <b>{uploaded}</b> из {total}.",
+            rows,
+        )
+    if step == "rk2s_upload_pending":
+        rows = [[("📅 Изменить период под чек", "stmt:period_fix")]] + nav
+        return (
+            "⚠️ Дата загруженного чека вне периода выписки. "
+            "Изменить период под чек или отменить?",
+            rows,
+        )
+    if step == "rk2s_shortage":
+        uploaded = len(s.get("rk2s_receipt_paths") or [])
+        total = int(s.get("rk2s_op_count") or 0)
+        rows = _rk2_rows2([
+            ("🎲 Дополнить случайно", "stmt:fill_random"),
+            (f"🔢 Платежей = чеков ({uploaded})", "stmt:reduce_count"),
+        ]) + nav
+        return (
+            f"⚠️ Загружено чеков: <b>{uploaded}</b>, а выбрано платежей: "
+            f"<b>{total}</b>. Что делаем?",
+            rows,
+        )
+    if step == "rk2s_day_choice":
+        buttons = []
+        if s.get("rk2s_receipt_paths"):
+            buttons.append(("📎 День загруженного чека", "stmt:day_receipt"))
+        buttons.append(("📅 Выбрать дату в периоде", "stmt:day_choose"))
+        rows = _rk2_rows2(buttons) + nav
+        return ("📅 <b>День случайных операций</b> — какой?", rows)
+    if step == "rk2s_op_date":
+        start = s.get("rk2s_period_start")
+        span = ""
+        if start:
+            span = f"{s['rk2s_period_start']:%d.%m.%Y}–{s['rk2s_period_end']:%d.%m.%Y}"
+        return (
+            f"📅 Введите дату внутри периода {span}.\n"
+            f"Нажмите, чтобы скопировать: <code>{start:%d.%m.%Y}</code>" if start else "📅 Введите дату в периоде.",
+            nav,
+        )
+    if step == "rk2s_ops_editor":
+        ops = list(s.get("rk2s_ops") or [])
+        buttons = [("➕ Добавить операцию", "sops:add")]
+        if ops:
+            buttons.append(("🗑 Удалить операцию", "sops:delete"))
+            buttons.append(("✅ Готово к сводке", "sops:done"))
+        else:
+            buttons.append(("📭 Без операций", "sops:none"))
+        lines = ["✍️ <b>Операции выписки</b>",
+                 "Раскладка этой выписки принимает только 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 операций. "
+                 "Не только random и не только PDF-чек — каждое поле задаёте сами. "
+                 "У Рокета все операции должны быть в один календарный день.", "",
+                 _rk2_ops_list_text(s)]
+        return ("\n".join(lines), _rk2_rows2(buttons) + nav)
+    if step == "rk2s_op_kind":
+        buttons = [
+            ("💸 Исходящий СБП", "sopk:sbp_out"),
+            ("💰 Входящий СБП", "sopk:sbp_in"),
+            ("💳 Перевод с карты", "sopk:card"),
+            ("⬇️ Пополнение", "sopk:topup"),
+        ]
+        return ("🔖 <b>Вид операции</b> — что печатает этот банк:", _rk2_rows2(buttons) + nav)
+    if step == "rk2s_op_amount":
+        return (
+            "💰 <b>Сумма операции.</b> Копейки можно.\n"
+            "Нажмите, чтобы скопировать: <code>1 500,00</code>",
+            nav,
+        )
+    if step == "rk2s_op_dt_choice":
+        start, end = s.get("rk2s_period_start"), s.get("rk2s_period_end")
+        span = f"{start:%d.%m.%Y}–{end:%d.%m.%Y}" if start and end else ""
+        rows = [[("🕒 Сейчас", "sopdt:now"), ("✍️ Ввести", "sopdt:input")]] + nav
+        return (f"🕒 <b>Дата и время операции</b> внутри периода {span}.", rows)
+    if step == "rk2s_op_dt_input":
+        start = s.get("rk2s_period_start")
+        example = start.strftime("%d.%m.%Y 12:40") if start else "04.11.2026 12:40"
+        return (
+            "🕒 Введите дату и время.\n"
+            f"Нажмите, чтобы скопировать: <code>{example}</code>",
+            nav,
+        )
+    if step == "rk2s_op_detail":
+        draft = s.get("rk2s_op_draft") or {}
+        kind = draft.get("kind")
+        if kind in ("sbp_out", "sbp_in"):
+            rows = []
+            phone = s.get("rk2s_phone")
+            if phone:
+                rows.append([(f"↩️ Телефон выписки ({phone})", "sopd:stmt_phone")])
+            rows += nav
+            return (
+                "📱 <b>Телефон</b> в операции СБП.\n"
+                "Нажмите, чтобы скопировать: <code>+7 900 351-70-80</code>",
+                rows,
+            )
+        if kind == "card":
+            return (
+                "💳 <b>Карта</b> операции. 16 цифр или маска.\n"
+                "Нажмите, чтобы скопировать: <code>2200 **** **** 9515</code>",
+                nav,
+            )
+        if kind == "topup":
+            rows = [[("↩️ Пропустить", "sopd:skip")]] + nav
+            return (
+                "💳 Последние 4 цифры карты пополнения (необязательно).\n"
+                "Нажмите, чтобы скопировать: <code>4432</code>",
+                rows,
+            )
+        return (
+            "📝 <b>Описание / контрагент</b> одной строкой.\n"
+            "Нажмите, чтобы скопировать: <code>Переводы через СБП.</code>",
+            nav,
+        )
+    if step == "rk2s_op_delete":
+        ops = list(s.get("rk2s_ops") or [])
+        buttons = [(str(i + 1), f"sopdel:{i}") for i in range(len(ops))]
+        return ("🗑 Какую операцию удалить?", _rk2_rows2(buttons) + nav)
+    raise ValueError(f"no rk2 prompt for {step}")
+
+
+_RK2_KIND_LABELS = {
+    "sbp_out": "Исходящий СБП",
+    "sbp_in": "Входящий СБП",
+    "card": "Перевод с карты",
+    "topup": "Пополнение",
+}
+
+
+def _rk2_ops_list_text(s: dict) -> str:
+    ops = list(s.get("rk2s_ops") or [])
+    if not ops:
+        return "Операций пока нет."
+    lines = []
+    for i, op in enumerate(ops, 1):
+        when = op.get("datetime", "")
+        if hasattr(when, "strftime"):
+            when = when.strftime("%d.%m.%Y %H:%M")
+        kind = _RK2_KIND_LABELS.get(op.get("kind"), op.get("kind") or "")
+        extra = op.get("description") or op.get("phone") or op.get("card") or ""
+        piece = f"{i}. {when} · {kind} · {op.get('amount', '')}"
+        if extra:
+            piece += f" · {extra}"
+        lines.append(piece)
+    return "\n".join(lines)
+
+
+def _rk2_receipt_summary_text(s: dict) -> str:
+    moment = s.get("rk2_operation_dt") or _rk2_current_time()
+    lines = ["<b>Проверь данные</b>", ""]
+    if s.get("rk2_scenario") == "rocket_card":
+        lines += [
+            "<b>ПОЛУЧАТЕЛЬ</b>",
+            f"💳 Карта: <b>{html.escape(str(s.get('rk2_recipient_card', '')))}</b>",
+            f"🏦 Банк: <b>{html.escape(str(s.get('rk2_recipient_bank_label') or '—'))}</b>",
+        ]
+    else:
+        lines += [
+            "<b>ПОЛУЧАТЕЛЬ</b>",
+            f"👤 Получатель: <b>{html.escape(str(s.get('rk2_recipient_name', '')))}</b>",
+            f"📱 Телефон: <b>{html.escape(str(s.get('rk2_recipient_phone', '')))}</b>",
+            f"🏦 Банк: <b>{html.escape(str(s.get('rk2_recipient_bank_label') or s.get('rk2_recipient_bank', '')))}</b>",
+        ]
+    lines += [
+        f"💰 Сумма: <b>{html.escape(str(s.get('rk2_amount', '')))}</b>",
+        "",
+        "<b>ОТПРАВИТЕЛЬ</b>",
+        f"👤 Отправитель: <b>{html.escape(str(s.get('rk2_sender_name', '')))}</b>",
+    ]
+    if s.get("rk2_scenario") != "rocket_card":
+        lines.append(f"📱 Телефон: <b>{html.escape(str(s.get('rk2_sender_phone', '')))}</b>")
+    lines += [
+        f"💳 Счёт: <b>{_rk2_masked_account(s.get('rk2_sender_account'))}</b>",
+        "🏦 Банк отправителя: <b>Рокет</b>",
+        f"🕒 Время: <b>{moment:%d.%m.%Y} {moment:%H:%M}</b> (МСК)",
+    ]
+    return "\n".join(lines)
+
+
+def _rk2_stmt_summary_text(s: dict) -> str:
+    lines = [
+        "<b>Проверь данные выписки</b>",
+        "",
+        f"📅 Период: <b>{s['rk2s_period_start']:%d.%m.%Y}–{s['rk2s_period_end']:%d.%m.%Y}</b>",
+        f"📅 Дата выдачи: <b>{s['rk2s_issue_date']:%d.%m.%Y}</b>",
+        f"👤 Держатель: <b>{html.escape(str(s.get('rk2s_holder', '')))}</b>",
+        f"📱 Телефон: <b>{html.escape(str(s.get('rk2s_phone', '')))}</b>",
+    ]
+    if s.get("rk2s_account"):
+        acc_disp = _rk2_masked_account(s["rk2s_account"])
+    elif s.get("rk2s_account_tail"):
+        acc_disp = f"…{s['rk2s_account_tail']}"
+    else:
+        acc_disp = f"…{ROCKET_DEFAULT_ACCOUNT_TAIL}"
+    lines.append(f"💳 Счёт: <b>{acc_disp}</b>")
+    opening = s.get("rk2s_opening", "0")
+    try:
+        from decimal import Decimal as _D
+        opening_disp = f"{_D(str(opening)):,.2f}".replace(",", " ").replace(".", ",")
+    except Exception:
+        opening_disp = str(opening)
+    lines.append(f"💰 Входящий остаток: <b>{opening_disp}</b>")
+    # источник платежей
+    total = int(s.get("rk2s_op_count") or 0)
+    uploaded = len(s.get("rk2s_receipt_paths") or [])
+    if s.get("rk2s_source") == "manual":
+        n = len(s.get("rk2s_ops") or [])
+        src_text = f"{n} платежей: настроены вручную" if n else "0 платежей: настроены вручную"
+    elif total == 0:
+        src_text = "0 платежей"
+    elif uploaded and s.get("rk2s_fill_random") and uploaded < total:
+        src_text = f"{total} платежей: {uploaded} из загруженных чеков + {total - uploaded} случайно по настоящим операциям"
+    elif uploaded:
+        src_text = f"{total} платежей: {uploaded} из загруженных чеков"
+    else:
+        src_text = f"{total} платежей: случайно по настоящим операциям"
+    lines.append(f"🔢 Платежи: <b>{html.escape(src_text)}</b>")
+    if s.get("rk2s_source") == "manual":
+        lines.append("")
+        lines.append(_rk2_ops_list_text(s))
+    if s.get("rk2s_fill_random") and total > uploaded:
+        day = s.get("rk2s_op_date")
+        if day:
+            lines.append(f"📅 День случайных операций: <b>{day:%d.%m.%Y}</b>")
+    return "\n".join(lines)
+
+
+async def _rk2_show(ev, uid, step: str, prefix: str = ""):
+    s = sessions.get(uid)
+    if not s:
+        return
+    s["step"] = step
+    s["rk2_uid"] = uid
+    hist = s.setdefault("rk2_hist", [])
+    if not hist or hist[-1] != step:
+        hist.append(step)
+    if step == "rk2_summary":
+        text = _rk2_receipt_summary_text(s)
+        rows = [[("✅ Сгенерировать", "rgen:generate"), ("✏️ Исправить", "rgen:edit")], _rk2_nav()]
+        await edit(ev, prefix + text, kb(*rows), uid)
+        return
+    if step == "rk2s_summary":
+        text = _rk2_stmt_summary_text(s)
+        rows = [[("✅ Сгенерировать", "sgen:generate"), ("✏️ Исправить", "sgen:edit")], _rk2_nav()]
+        await edit(ev, prefix + text, kb(*rows), uid)
+        return
+    text, rows = _rk2_prompt(s, step)
+    await edit(ev, prefix + text, kb(*rows), uid)
+
+
+async def _rk2_back(ev, uid):
+    s = sessions.get(uid)
+    if not s:
+        return
+    hist = s.get("rk2_hist") or []
+    if len(hist) >= 2:
+        hist.pop()
+        await _rk2_show(ev, uid, hist[-1])
+    else:
+        # назад в меню рокета
+        rows = _rk2_rows2([
+            ("💸 Перевод по СБП", "rocket:sbp"),
+            ("💳 Перевод по номеру карты", "rocket:card"),
+            ("📄 Выписка", "rocket:stmt"),
+            ("🏠 Главное меню", "home"),
+            ("❌ Отмена", "cancel"),
+        ])
+        await edit(ev, "🚀 <b>Рокетбанк</b>. Что сформировать?", kb(*rows), uid)
+
+
+def _rk2_save_memory(uid):
+    s = sessions.get(uid) or {}
+    mem = ROCKET_MEM.setdefault(uid, {})
+    if s.get("rk2_sender_name"):
+        prev = mem.get("sender") or {}
+        mem["sender"] = {
+            "sender_name": s.get("rk2_sender_name"),
+            "sender_phone": s.get("rk2_sender_phone") or prev.get("sender_phone"),
+            "sender_account": s.get("rk2_sender_account"),
+        }
+    if s.get("rk2_scenario") == "rocket_sbp" and s.get("rk2_recipient_name"):
+        mem["recipient_sbp"] = {
+            "recipient_name": s.get("rk2_recipient_name"),
+            "recipient_phone": s.get("rk2_recipient_phone"),
+            "recipient_bank": s.get("rk2_recipient_bank"),
+            "recipient_bank_label": s.get("rk2_recipient_bank_label"),
+        }
+    if s.get("rk2_scenario") == "rocket_card" and s.get("rk2_recipient_card"):
+        mem["recipient_card"] = {
+            "recipient_card": s.get("rk2_recipient_card"),
+            "recipient_bank": s.get("rk2_recipient_bank"),
+            "recipient_bank_label": s.get("rk2_recipient_bank_label"),
+        }
+
+
+@router.callback_query(F.data == "rocket:menu")
+async def cb_rk2_menu(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    rows = _rk2_rows2([
+        ("💸 Перевод по СБП", "rocket:sbp"),
+        ("💳 Перевод по номеру карты", "rocket:card"),
+        ("📄 Выписка", "rocket:stmt"),
+        ("🏠 Главное меню", "home"),
+        ("❌ Отмена", "cancel"),
+    ])
+    await edit(cb, "🚀 <b>Рокетбанк</b>. Что сформировать?", kb(*rows), uid)
+    await cb.answer()
+
+
+@router.callback_query(F.data == "rocket:sbp")
+async def cb_rk2_sbp_start(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    sessions[uid] = {"step": "rk2_rcpt_name", "rk2_scenario": "rocket_sbp", "rk2_hist": [], "rk2_uid": uid, "mid": cb.message.message_id}
+    await _rk2_show(cb, uid, "rk2_rcpt_name")
+    await cb.answer()
+
+
+@router.callback_query(F.data == "rocket:card")
+async def cb_rk2_card_start(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    sessions[uid] = {"step": "rk2_rcpt_card", "rk2_scenario": "rocket_card", "rk2_hist": [], "rk2_uid": uid, "mid": cb.message.message_id}
+    await _rk2_show(cb, uid, "rk2_rcpt_card")
+    await cb.answer()
+
+
+@router.callback_query(F.data == "rocket:stmt")
+async def cb_rk2_stmt_start(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    sessions[uid] = {"step": "rk2s_period", "rk2_scenario": "rocket_statement", "rk2_hist": [], "rk2_uid": uid,
+                     "rk2s_receipt_paths": [], "rk2s_receipt_dates": [], "rk2s_fill_random": True,
+                     "rk2s_op_date": None, "rk2s_acc_mode": "keep", "rk2s_account": None, "rk2s_account_tail": None,
+                     "mid": cb.message.message_id}
+    await _rk2_show(cb, uid, "rk2s_period")
+    await cb.answer()
+
+
+@router.callback_query(F.data == "rk2:back")
+async def cb_rk2_back(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    await _rk2_back(cb, uid)
+    await cb.answer()
+
+
+@router.callback_query(F.data == "rmem:recipient")
+async def cb_rk2_mem_recipient(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    mem = ROCKET_MEM.get(uid, {})
+    if s.get("rk2_scenario") == "rocket_card":
+        m = mem.get("recipient_card") or {}
+        s["rk2_recipient_card"] = m.get("recipient_card")
+        s["rk2_recipient_bank"] = m.get("recipient_bank")
+        s["rk2_recipient_bank_label"] = m.get("recipient_bank_label")
+        await _rk2_show(cb, uid, "rk2_amount")
+    else:
+        m = mem.get("recipient_sbp") or {}
+        s["rk2_recipient_name"] = m.get("recipient_name")
+        s["rk2_recipient_phone"] = m.get("recipient_phone")
+        s["rk2_recipient_bank"] = m.get("recipient_bank")
+        s["rk2_recipient_bank_label"] = m.get("recipient_bank_label")
+        await _rk2_show(cb, uid, "rk2_amount")
+    await cb.answer()
+
+
+@router.callback_query(F.data == "rmem:sender")
+async def cb_rk2_mem_sender(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    m = (ROCKET_MEM.get(uid, {}).get("sender") or {})
+    s["rk2_sender_name"] = m.get("sender_name")
+    s["rk2_sender_phone"] = m.get("sender_phone")
+    s["rk2_sender_account"] = m.get("sender_account")
+    await _rk2_show(cb, uid, "rk2_time_choice")
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("rbank:"))
+async def cb_rk2_bank(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    slug = cb.data.split(":", 1)[1]
+    if slug == "custom":
+        await _rk2_show(cb, uid, "rk2_rcpt_bank_custom")
+        await cb.answer()
+        return
+    options = ROCKET_CARD_BANK_OPTIONS if s.get("rk2_scenario") == "rocket_card" else ROCKET_SBP_BANK_OPTIONS
+    found = {sl: (label, value) for sl, label, value in options}
+    label, value = found.get(slug, (slug, slug))
+    s["rk2_recipient_bank"] = value
+    s["rk2_recipient_bank_label"] = label if value is not None else None
+    await _rk2_show(cb, uid, "rk2_amount")
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("rsacc:"))
+async def cb_rk2_sender_acc(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    slug = cb.data.split(":", 1)[1]
+    if slug == "custom":
+        await _rk2_show(cb, uid, "rk2_sender_acc_input")
+    elif slug == "default":
+        s["rk2_sender_account"] = None
+        await _rk2_show(cb, uid, "rk2_time_choice")
+    elif slug.startswith("rand"):
+        idx = int(slug[4:])
+        candidates = s.get("rk2_acc_candidates") or []
+        s["rk2_sender_account"] = candidates[idx] if idx < len(candidates) else None
+        await _rk2_show(cb, uid, "rk2_time_choice")
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("rtime:"))
+async def cb_rk2_time(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    slug = cb.data.split(":", 1)[1]
+    if slug == "now":
+        s["rk2_operation_dt"] = _rk2_current_time()
+        await _rk2_show(cb, uid, "rk2_summary")
+    else:
+        await _rk2_show(cb, uid, "rk2_time_input")
+    await cb.answer()
+
+
+@router.callback_query(F.data == "rgen:edit")
+async def cb_rk2_edit(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    if s.get("rk2_scenario") == "rocket_card":
+        keys = ["recipient_card", "recipient_bank", "amount", "sender_name", "sender_account", "operation_time"]
+    else:
+        keys = ["recipient_name", "recipient_phone", "recipient_bank", "amount", "sender_name", "sender_phone", "sender_account", "operation_time"]
+    labels = {
+        "recipient_name": "👤 Получатель", "recipient_phone": "📱 Телефон получателя",
+        "recipient_bank": "🏦 Банк получателя", "recipient_card": "💳 Карта получателя",
+        "amount": "💰 Сумма", "sender_name": "👤 Отправитель",
+        "sender_phone": "📱 Телефон отправителя", "sender_account": "💳 Счёт отправителя",
+        "operation_time": "🕒 Время операции",
+    }
+    buttons = [(labels[k], f"rkedit:{k}") for k in keys]
+    rows = _rk2_rows2(buttons) + [_rk2_nav()]
+    s["step"] = "rk2_edit_select"
+    await edit(cb, "Что исправить?", kb(*rows), uid)
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("rkedit:"))
+async def cb_rk2_edit_field(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    key = cb.data.split(":", 1)[1]
+    state_map = {
+        "recipient_name": "rk2_rcpt_name", "recipient_phone": "rk2_rcpt_phone",
+        "recipient_bank": "rk2_rcpt_bank", "recipient_card": "rk2_rcpt_card",
+        "amount": "rk2_amount", "sender_name": "rk2_sender_name",
+        "sender_phone": "rk2_sender_phone", "sender_account": "rk2_sender_acc_choice",
+        "operation_time": "rk2_time_choice",
+    }
+    s["rk2_editing"] = True
+    await _rk2_show(cb, uid, state_map[key])
+    await cb.answer()
+
+
+@router.callback_query(F.data == "rgen:generate")
+async def cb_rk2_generate(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    await cb.answer()
+    await _rk2_do_generate(cb, uid)
+
+
+async def _rk2_do_generate(ev, uid):
+    s = sessions.get(uid)
+    if not s:
+        await bot.send_message(uid, "❌ Сессия устарела — начни заново: /start", reply_markup=main_menu(uid))
+        return
+    await _progress_action(uid)
+    qmsg = await _queue_notice(uid)
+    try:
+        adapter = ck()
+        moment = s.get("rk2_operation_dt") or _rk2_current_time()
+        if s.get("rk2_scenario") == "rocket_card":
+            pdf = await run_gen(adapter.gen_rocket_card,
+                                sender_name=s.get("rk2_sender_name", ""),
+                                sender_account=s.get("rk2_sender_account"),
+                                recipient_card=s.get("rk2_recipient_card", ""),
+                                recipient_bank=s.get("rk2_recipient_bank"),
+                                amount=str(s.get("rk2_amount_int", "")) or s.get("rk2_amount", ""),
+                                operation_dt=moment)
+            who = f"Карта {s.get('rk2_recipient_card')} · {s.get('rk2_recipient_bank_label') or 'без банка'}"
+            restart_cb = "rocket:card"
+        else:
+            pdf = await run_gen(adapter.gen_rocket_sbp,
+                                sender_name=s.get("rk2_sender_name", ""),
+                                sender_account=s.get("rk2_sender_account"),
+                                sender_phone=s.get("rk2_sender_phone", ""),
+                                recipient_name=s.get("rk2_recipient_name", ""),
+                                recipient_phone=s.get("rk2_recipient_phone", ""),
+                                recipient_bank=s.get("rk2_recipient_bank") or "Сбербанк",
+                                amount=str(s.get("rk2_amount_int", "")) or s.get("rk2_amount", ""),
+                                operation_dt=moment)
+            who = (f"{s.get('rk2_recipient_name')} · {s.get('rk2_recipient_phone')} · "
+                   f"{s.get('rk2_recipient_bank_label') or s.get('rk2_recipient_bank')}")
+            restart_cb = "rocket:sbp"
+    except Exception as e:
+        await _clear_note(qmsg)
+        await _rk2_show(ev, uid, "rk2_summary",
+                        prefix=f"Не получилось: {html.escape(str(e))[:200]}\nИсправьте данные в сводке и попробуйте ещё раз.\n\n")
+        return
+    await _clear_note(qmsg)
+    _rk2_save_memory(uid)
+    sender_acc_disp = _rk2_masked_account(s.get("rk2_sender_account"))
+    caption = (
+        "✅ Чек готов\n"
+        f"{who}\n"
+        f"Сумма: {s.get('rk2_amount')}\n"
+        f"Отправитель: {s.get('rk2_sender_name')} · счёт {sender_acc_disp}\n"
+        f"Время: {moment:%d.%m.%Y} {moment:%H:%M} МСК"
+    )
+    if sessions.get(uid) is s:
+        sessions.pop(uid, None)
+    await bot.send_document(
+        uid,
+        BufferedInputFile(pdf, filename="receipt_rocket.pdf"),
+        caption=caption,
+        reply_markup=kb([("🔁 Ещё чек", restart_cb)], [("🏠 Главное меню", "home")]))
+    if gfeat("log_all_banks"):
+        data["logs"].append({"uid": uid, "type": "rocket", "amount": s.get("rk2_amount"), "ts": now_msk().isoformat()})
+
+
+# ── Выписка: callbacks ───────────────────────────────────────────────────
+
+@router.callback_query(F.data.startswith("sissue:"))
+async def cb_rk2s_issue(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    slug = cb.data.split(":", 1)[1]
+    if slug == "custom":
+        await _rk2_show(cb, uid, "rk2s_issue_input")
+    else:
+        s["rk2s_issue_date"] = _rk2_current_time().date()
+        await _rk2_show(cb, uid, "rk2s_holder")
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("sacc:"))
+async def cb_rk2s_acc(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    slug = cb.data.split(":", 1)[1]
+    if slug == "tail":
+        await _rk2_show(cb, uid, "rk2s_acc_tail")
+    elif slug == "full":
+        await _rk2_show(cb, uid, "rk2s_acc_full")
+    elif slug == "random":
+        import secrets as _sec
+        s["rk2s_acc_mode"] = "tail"
+        s["rk2s_account_tail"] = "".join(_sec.choice("0123456789") for _ in range(5))
+        s["rk2s_account"] = None
+        await _rk2_show(cb, uid, "rk2s_opening")
+    else:  # keep
+        s["rk2s_acc_mode"] = "keep"
+        s["rk2s_account"] = None
+        s["rk2s_account_tail"] = None
+        await _rk2_show(cb, uid, "rk2s_opening")
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("scount:"))
+async def cb_rk2s_count(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    slug = cb.data.split(":", 1)[1]
+    if slug == "custom":
+        await _rk2_show(cb, uid, "rk2s_count_input")
+        await cb.answer()
+        return
+    s["rk2s_op_count"] = int(slug)
+    await _rk2s_after_count(cb, uid)
+    await cb.answer()
+
+
+async def _rk2s_after_count(ev, uid):
+    s = sessions.get(uid)
+    total = int(s.get("rk2s_op_count") or 0)
+    uploaded = len(s.get("rk2s_receipt_paths") or [])
+    if total < uploaded:
+        await _rk2_show(ev, uid, "rk2s_count_choice",
+                        prefix=(f"⚠️ Уже загружено чеков: {uploaded}, поэтому платежей "
+                                f"не может быть меньше. Выберите число не меньше "
+                                f"{uploaded} или начните выписку заново через «Отмена».\n\n"))
+        return
+    if total == 0:
+        s["rk2s_fill_random"] = False
+        s["rk2s_op_date"] = None
+        await _rk2_show(ev, uid, "rk2s_summary")
+        return
+    if s.pop("rk2_editing", False):
+        if uploaded and total == uploaded:
+            s["rk2s_fill_random"] = False
+            await _rk2_show(ev, uid, "rk2s_summary")
+            return
+        if uploaded:
+            await _rk2_show(ev, uid, "rk2s_shortage")
+            return
+        s["rk2s_fill_random"] = True
+        await _rk2_show(ev, uid, "rk2s_day_choice")
+        return
+    await _rk2_show(ev, uid, "rk2s_source")
+
+
+@router.callback_query(F.data.startswith("ssource:"))
+async def cb_rk2s_source(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    slug = cb.data.split(":", 1)[1]
+    s["rk2s_source"] = slug
+    if slug == "manual":
+        s["rk2s_fill_random"] = False
+        s.setdefault("rk2s_ops", [])
+        await _rk2_show(cb, uid, "rk2s_ops_editor")
+    elif slug == "random":
+        s["rk2s_fill_random"] = True
+        s["rk2s_ops"] = []
+        await _rk2_show(cb, uid, "rk2s_day_choice")
+    else:  # upload / mixed
+        s["rk2s_fill_random"] = slug == "mixed"
+        s["rk2s_ops"] = []
+        await _rk2_show(cb, uid, "rk2s_upload")
+    await cb.answer()
+
+
+@router.callback_query(F.data == "stmt:uploads_done")
+async def cb_rk2s_uploads_done(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    uploaded = len(s.get("rk2s_receipt_paths") or [])
+    total = int(s.get("rk2s_op_count") or 0)
+    if uploaded < total and s.get("rk2s_source") == "upload":
+        await _rk2_show(cb, uid, "rk2s_shortage")
+        await cb.answer()
+        return
+    s["rk2s_fill_random"] = False
+    await _rk2_show(cb, uid, "rk2s_summary")
+    await cb.answer()
+
+
+@router.callback_query(F.data == "stmt:period_fix")
+async def cb_rk2s_period_fix(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    pending_path = s.pop("rk2s_pending_path", None)
+    pending_date = s.pop("rk2s_pending_date", None)
+    if pending_path and pending_date:
+        from datetime import date as _date
+        rd = _date.fromisoformat(str(pending_date))
+        s["rk2s_period_start"] = min(s["rk2s_period_start"], rd)
+        s["rk2s_period_end"] = max(s["rk2s_period_end"], rd)
+        s.setdefault("rk2s_receipt_paths", []).append(pending_path)
+        s.setdefault("rk2s_receipt_dates", []).append(rd.isoformat())
+        prefix = (f"📅 Период изменён под чек: {s['rk2s_period_start']:%d.%m.%Y}–"
+                  f"{s['rk2s_period_end']:%d.%m.%Y}.\nЗагружено чеков: {len(s['rk2s_receipt_paths'])}\n\n")
+        await _rk2_show(cb, uid, "rk2s_upload", prefix=prefix)
+    await cb.answer()
+
+
+@router.callback_query(F.data == "stmt:fill_random")
+async def cb_rk2s_fill_random(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    s["rk2s_fill_random"] = True
+    await _rk2_show(cb, uid, "rk2s_day_choice")
+    await cb.answer()
+
+
+@router.callback_query(F.data == "stmt:reduce_count")
+async def cb_rk2s_reduce(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    s["rk2s_op_count"] = len(s.get("rk2s_receipt_paths") or [])
+    s["rk2s_fill_random"] = False
+    s["rk2s_op_date"] = None
+    await _rk2_show(cb, uid, "rk2s_summary")
+    await cb.answer()
+
+
+@router.callback_query(F.data == "stmt:day_receipt")
+async def cb_rk2s_day_receipt(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    from datetime import date as _date
+    dates = s.get("rk2s_receipt_dates") or []
+    if dates:
+        s["rk2s_op_date"] = _date.fromisoformat(str(dates[0]))
+        await _rk2_show(cb, uid, "rk2s_summary")
+    else:
+        await _rk2_show(cb, uid, "rk2s_op_date")
+    await cb.answer()
+
+
+@router.callback_query(F.data == "stmt:day_choose")
+async def cb_rk2s_day_choose(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    await _rk2_show(cb, uid, "rk2s_op_date")
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("sops:"))
+async def cb_rk2s_ops(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    slug = cb.data.split(":", 1)[1]
+    if slug == "add":
+        await _rk2_show(cb, uid, "rk2s_op_kind")
+    elif slug == "delete":
+        await _rk2_show(cb, uid, "rk2s_op_delete")
+    elif slug == "done":
+        await _rk2_show(cb, uid, "rk2s_summary")
+    elif slug == "none":
+        s["rk2s_ops"] = []
+        await _rk2_show(cb, uid, "rk2s_summary")
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("sopk:"))
+async def cb_rk2s_op_kind(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    s["rk2s_op_draft"] = {"kind": cb.data.split(":", 1)[1]}
+    await _rk2_show(cb, uid, "rk2s_op_amount")
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("sopdt:"))
+async def cb_rk2s_op_dt(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    slug = cb.data.split(":", 1)[1]
+    if slug == "now":
+        draft = s.setdefault("rk2s_op_draft", {})
+        draft["datetime"] = _rk2_current_time()
+        await _rk2_show(cb, uid, "rk2s_op_detail")
+    else:
+        await _rk2_show(cb, uid, "rk2s_op_dt_input")
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("sopd:"))
+async def cb_rk2s_op_detail(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    slug = cb.data.split(":", 1)[1]
+    draft = s.setdefault("rk2s_op_draft", {})
+    if slug == "stmt_phone":
+        draft["phone"] = s.get("rk2s_phone", "")
+    # skip / stmt_phone -> завершаем операцию
+    _rk2s_finish_op(s)
+    await _rk2_show(cb, uid, "rk2s_ops_editor")
+    await cb.answer()
+
+
+def _rk2s_finish_op(s: dict):
+    draft = s.pop("rk2s_op_draft", {}) or {}
+    op = {
+        "kind": draft.get("kind", "sbp_out"),
+        "datetime": draft.get("datetime"),
+        "amount": draft.get("amount", ""),
+    }
+    if draft.get("phone"):
+        op["phone"] = draft["phone"]
+    if draft.get("card"):
+        op["card"] = draft["card"]
+    if draft.get("description"):
+        op["description"] = draft["description"]
+    s.setdefault("rk2s_ops", []).append(op)
+
+
+@router.callback_query(F.data.startswith("sopdel:"))
+async def cb_rk2s_op_delete(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    idx = int(cb.data.split(":", 1)[1])
+    ops = s.get("rk2s_ops") or []
+    if 0 <= idx < len(ops):
+        ops.pop(idx)
+    await _rk2_show(cb, uid, "rk2s_ops_editor")
+    await cb.answer()
+
+
+@router.callback_query(F.data == "sgen:edit")
+async def cb_rk2s_edit(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    labels = {
+        "stmt_period": "📅 Период", "stmt_issue": "📅 Дата выдачи",
+        "stmt_holder": "👤 Держатель", "stmt_phone": "📱 Телефон",
+        "stmt_account": "💳 Счёт", "stmt_opening": "💰 Входящий остаток",
+        "stmt_op_count": "🔢 Число платежей", "stmt_ops": "✍️ Операции",
+    }
+    state_map = {
+        "stmt_period": "rk2s_period", "stmt_issue": "rk2s_issue_choice",
+        "stmt_holder": "rk2s_holder", "stmt_phone": "rk2s_phone",
+        "stmt_account": "rk2s_acc_choice", "stmt_opening": "rk2s_opening",
+        "stmt_op_count": "rk2s_count_choice", "stmt_ops": "rk2s_ops_editor",
+    }
+    s["rk2s_edit_map"] = state_map
+    buttons = [(label, f"sedit:{key}") for key, label in labels.items()]
+    rows = _rk2_rows2(buttons) + [_rk2_nav()]
+    s["step"] = "rk2s_edit_select"
+    await edit(cb, "Что исправить?", kb(*rows), uid)
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("sedit:"))
+async def cb_rk2s_edit_field(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    key = cb.data.split(":", 1)[1]
+    state_map = s.get("rk2s_edit_map") or {}
+    s["rk2_editing"] = True
+    await _rk2_show(cb, uid, state_map.get(key, "rk2s_summary"))
+    await cb.answer()
+
+
+@router.callback_query(F.data == "sgen:generate")
+async def cb_rk2s_generate(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid):
+        await cb.answer("Нет доступа")
+        return
+    s = sessions.get(uid)
+    if not s:
+        await cb.answer("Начни заново")
+        return
+    await cb.answer()
+    await _rk2s_do_generate(cb, uid)
+
+
+async def _rk2s_do_generate(ev, uid):
+    s = sessions.get(uid)
+    if not s:
+        await bot.send_message(uid, "❌ Сессия устарела — начни заново: /start", reply_markup=main_menu(uid))
+        return
+    # manual: ровно столько операций, сколько настроено
+    if s.get("rk2s_source") == "manual":
+        ops_manual = list(s.get("rk2s_ops") or [])
+        if len(ops_manual) > 10:
+            await _rk2_show(ev, uid, "rk2s_summary",
+                            prefix=f"⚠️ Сейчас операций: {len(ops_manual)}. Для этой выписки нужно не больше 10.\n\n")
+            return
+        s["rk2s_op_count"] = len(ops_manual)
+        s["rk2s_fill_random"] = False
+    await _progress_action(uid)
+    qmsg = await _queue_notice(uid)
+    try:
+        adapter = ck()
+        ops_arg = None
+        if s.get("rk2s_source") == "manual":
+            ops_arg = []
+            for op in s.get("rk2s_ops") or []:
+                moment = op.get("datetime")
+                ops_arg.append({
+                    "kind": op.get("kind", "sbp_out"),
+                    "datetime": moment,
+                    "amount": op.get("amount", ""),
+                    "phone": op.get("phone", ""),
+                    "card": op.get("card", ""),
+                    "description": op.get("description", ""),
+                })
+        account = s.get("rk2s_account") if s.get("rk2s_acc_mode") == "full" else None
+        account_tail = s.get("rk2s_account_tail") if s.get("rk2s_acc_mode") == "tail" else None
+        pdf = await run_gen(adapter.gen_rocket_statement_full,
+                            period_start=s["rk2s_period_start"],
+                            period_end=s["rk2s_period_end"],
+                            issue_date=s.get("rk2s_issue_date"),
+                            holder_name=s.get("rk2s_holder", ""),
+                            phone=s.get("rk2s_phone", ""),
+                            account=account, account_tail=account_tail,
+                            opening_balance=s.get("rk2s_opening", "0"),
+                            operation_count=int(s.get("rk2s_op_count") or 0),
+                            receipt_paths=list(s.get("rk2s_receipt_paths") or []),
+                            operations=ops_arg,
+                            fill_random=bool(s.get("rk2s_fill_random", True)),
+                            operation_date=s.get("rk2s_op_date"))
+    except Exception as e:
+        await _clear_note(qmsg)
+        await _rk2_show(ev, uid, "rk2s_summary",
+                        prefix=f"Не получилось: {html.escape(str(e))[:200]}\nИсправьте данные в сводке и попробуйте ещё раз.\n\n")
+        return
+    await _clear_note(qmsg)
+    # caption как в оригинале
+    if s.get("rk2s_account"):
+        acc_disp = _rk2_masked_account(s["rk2s_account"])
+    elif s.get("rk2s_account_tail"):
+        acc_disp = f"…{s['rk2s_account_tail']}"
+    else:
+        acc_disp = f"…{ROCKET_DEFAULT_ACCOUNT_TAIL}"
+    try:
+        from decimal import Decimal as _D
+        opening_disp = f"{_D(str(s.get('rk2s_opening', '0'))):,.2f}".replace(",", " ").replace(".", ",")
+    except Exception:
+        opening_disp = str(s.get("rk2s_opening", "0"))
+    total = int(s.get("rk2s_op_count") or 0)
+    uploaded = len(s.get("rk2s_receipt_paths") or [])
+    if s.get("rk2s_source") == "manual":
+        n = len(s.get("rk2s_ops") or [])
+        src_text = f"{n} платежей: настроены вручную" if n else "0 платежей: настроены вручную"
+    elif total == 0:
+        src_text = "0 платежей"
+    elif uploaded and s.get("rk2s_fill_random") and uploaded < total:
+        src_text = f"{total} платежей: {uploaded} из загруженных чеков + {total - uploaded} случайно по настоящим операциям"
+    elif uploaded:
+        src_text = f"{total} платежей: {uploaded} из загруженных чеков"
+    else:
+        src_text = f"{total} платежей: случайно по настоящим операциям"
+    caption = (
+        "✅ Выписка готова\n"
+        f"Период: {s['rk2s_period_start']:%d.%m.%Y}–{s['rk2s_period_end']:%d.%m.%Y}\n"
+        f"Держатель: {s.get('rk2s_holder')}\n"
+        f"Счёт: {acc_disp}\n"
+        f"Входящий остаток: {opening_disp}\n"
+        f"{src_text}"
+    )
+    # чистка загруженных файлов
+    for pth in list(s.get("rk2s_receipt_paths") or []):
+        try:
+            import os as _os
+            _os.unlink(pth)
+        except Exception:
+            pass
+    if sessions.get(uid) is s:
+        sessions.pop(uid, None)
+    await bot.send_document(
+        uid,
+        BufferedInputFile(pdf, filename="Документ.pdf"),
+        caption=caption,
+        reply_markup=kb([("🔁 Новая выписка", "rocket:stmt")], [("🏠 Главное меню", "home")]))
+    if gfeat("log_all_banks"):
+        data["logs"].append({"uid": uid, "type": "rocket_stmt", "ts": now_msk().isoformat()})
+
+
+# ── Текстовый диспетчер rk2 ─────────────────────────────────────────────
+
+async def _rk2_invalid(ev, uid, error, step):
+    await _rk2_show(ev, uid, step, prefix=f"⚠️ {html.escape(str(error))}\n\n")
+
+
+async def _rk2_after_field(ev, uid, next_step):
+    s = sessions.get(uid)
+    if s and s.pop("rk2_editing", False):
+        target = "rk2s_summary" if str(next_step).startswith("rk2s") or s.get("rk2_scenario") == "rocket_statement" else "rk2_summary"
+        # для выписки редактирование ведёт в её сводку, для чека — в свою
+        if s.get("rk2_scenario") == "rocket_statement":
+            target = "rk2s_summary"
+        else:
+            target = "rk2_summary"
+        await _rk2_show(ev, uid, target)
+        return
+    await _rk2_show(ev, uid, next_step)
+
+
+async def _rk2_handle_text(msg, uid, s):
+    step = s.get("step", "")
+    text = msg.text.strip()
+    adapter = ck()
+
+    # ── Чек ──
+    if step == "rk2_rcpt_name":
+        try:
+            s["rk2_recipient_name"] = _rk2_parse_name(text, "ФИО получателя")
+        except ValueError as e:
+            await _rk2_invalid(msg, uid, e, step); return
+        await _rk2_after_field(msg, uid, "rk2_rcpt_phone"); return
+    if step == "rk2_rcpt_phone":
+        try:
+            s["rk2_recipient_phone"] = _rk2_parse_phone(text)
+        except ValueError as e:
+            await _rk2_invalid(msg, uid, e, step); return
+        await _rk2_after_field(msg, uid, "rk2_rcpt_bank"); return
+    if step == "rk2_rcpt_card":
+        raw = text
+        digits = re.sub(r"\D", "", raw)
+        if "*" in raw or "•" in raw:
+            s["rk2_recipient_card"] = raw
+        elif len(digits) == 16:
+            s["rk2_recipient_card"] = f"{digits[:4]} **** **** {digits[-4:]}"
+        else:
+            await _rk2_invalid(msg, uid, ValueError("Не понял карту. Введите 16 цифр или маску, например: 2200 **** **** 9515"), step); return
+        await _rk2_after_field(msg, uid, "rk2_rcpt_bank"); return
+    if step == "rk2_rcpt_bank_custom":
+        cleaned = " ".join(text.split())
+        if not (2 <= len(cleaned) <= 64):
+            await _rk2_invalid(msg, uid, ValueError("Не понял название банка. Введите, например: Сбербанк"), step); return
+        s["rk2_recipient_bank"] = cleaned
+        s["rk2_recipient_bank_label"] = cleaned
+        await _rk2_after_field(msg, uid, "rk2_amount"); return
+    if step == "rk2_amount":
+        try:
+            s["rk2_amount"] = _rk2_parse_amount(text)
+            s["rk2_amount_int"] = int(re.sub(r"\D", "", s["rk2_amount"]))
+        except ValueError as e:
+            await _rk2_invalid(msg, uid, e, step); return
+        await _rk2_after_field(msg, uid, "rk2_sender_name"); return
+    if step == "rk2_sender_name":
+        try:
+            s["rk2_sender_name"] = _rk2_parse_name(text, "ФИО отправителя")
+        except ValueError as e:
+            await _rk2_invalid(msg, uid, e, step); return
+        nxt = "rk2_sender_acc_choice" if s.get("rk2_scenario") == "rocket_card" else "rk2_sender_phone"
+        await _rk2_after_field(msg, uid, nxt); return
+    if step == "rk2_sender_phone":
+        try:
+            s["rk2_sender_phone"] = _rk2_parse_phone(text)
+        except ValueError as e:
+            await _rk2_invalid(msg, uid, e, step); return
+        await _rk2_after_field(msg, uid, "rk2_sender_acc_choice"); return
+    if step == "rk2_sender_acc_input":
+        digits = re.sub(r"\D", "", text)
+        if len(digits) != 20:
+            await _rk2_invalid(msg, uid, ValueError("Счёт должен быть из 20 цифр."), step); return
+        s["rk2_sender_account"] = digits
+        await _rk2_after_field(msg, uid, "rk2_time_choice"); return
+    if step == "rk2_time_input":
+        cleaned = " ".join(text.split())
+        parsed = None
+        for fmt in ("%d.%m.%Y %H:%M", "%H:%M"):
+            try:
+                parsed = datetime.strptime(cleaned, fmt)
+                if fmt == "%H:%M":
+                    today = _rk2_current_time()
+                    parsed = today.replace(hour=parsed.hour, minute=parsed.minute)
+                break
+            except ValueError:
+                continue
+        if parsed is None:
+            await _rk2_invalid(msg, uid, ValueError("Не понял время. Введите, например: 03.11.2026 16:26 или 16:26"), step); return
+        s["rk2_operation_dt"] = parsed
+        await _rk2_after_field(msg, uid, "rk2_summary"); return
+
+    # ── Выписка: шапка ──
+    if step == "rk2s_period":
+        found = re.findall(r"(\d{2})\.(\d{2})\.(\d{4})", text or "")
+        if len(found) != 2:
+            await _rk2_invalid(msg, uid, ValueError("Не понял период. Введите, например: 16.10.2026–23.10.2026"), step); return
+        try:
+            from datetime import date as _date
+            start = _date(int(found[0][2]), int(found[0][1]), int(found[0][0]))
+            end = _date(int(found[1][2]), int(found[1][1]), int(found[1][0]))
+        except ValueError:
+            await _rk2_invalid(msg, uid, ValueError("В периоде нет такой даты. Введите, например: 16.10.2026–23.10.2026"), step); return
+        if end < start:
+            await _rk2_invalid(msg, uid, ValueError("Конец периода раньше начала. Введите, например: 16.10.2026–23.10.2026"), step); return
+        s["rk2s_period_start"] = start
+        s["rk2s_period_end"] = end
+        await _rk2_after_field(msg, uid, "rk2s_issue_choice"); return
+    if step == "rk2s_issue_input":
+        cleaned = " ".join(text.split())
+        parsed = None
+        for fmt in ("%d.%m.%Y", "%Y-%m-%d"):
+            try:
+                parsed = datetime.strptime(cleaned, fmt).date(); break
+            except ValueError:
+                continue
+        if parsed is None:
+            await _rk2_invalid(msg, uid, ValueError("Не понял дату выдачи. Введите, например: 03.11.2026"), step); return
+        s["rk2s_issue_date"] = parsed
+        await _rk2_after_field(msg, uid, "rk2s_holder"); return
+    if step == "rk2s_holder":
+        try:
+            s["rk2s_holder"] = _rk2_parse_name(text, "ФИО держателя")
+        except ValueError as e:
+            await _rk2_invalid(msg, uid, e, step); return
+        await _rk2_after_field(msg, uid, "rk2s_phone"); return
+    if step == "rk2s_phone":
+        try:
+            s["rk2s_phone"] = _rk2_parse_phone(text)
+        except ValueError as e:
+            await _rk2_invalid(msg, uid, e, step); return
+        await _rk2_after_field(msg, uid, "rk2s_acc_choice"); return
+    if step == "rk2s_acc_tail":
+        digits = re.sub(r"\D", "", text or "")
+        if len(digits) != 5:
+            await _rk2_invalid(msg, uid, ValueError("Нужны ровно последние 5 цифр счёта, например: 12345"), step); return
+        s["rk2s_account_tail"] = digits
+        s["rk2s_acc_mode"] = "tail"
+        s["rk2s_account"] = None
+        await _rk2_after_field(msg, uid, "rk2s_opening"); return
+    if step == "rk2s_acc_full":
+        digits = re.sub(r"\D", "", text or "")
+        if len(digits) != 20:
+            await _rk2_invalid(msg, uid, ValueError("Счёт должен быть из 20 цифр."), step); return
+        s["rk2s_account"] = digits
+        s["rk2s_acc_mode"] = "full"
+        s["rk2s_account_tail"] = None
+        await _rk2_after_field(msg, uid, "rk2s_opening"); return
+    if step == "rk2s_opening":
+        cleaned = re.sub(r"[\s\u00a0\u202f]", "", text.strip()).replace(",", ".")
+        try:
+            from decimal import Decimal as _D, InvalidOperation as _IO
+            value = _D(cleaned)
+            if value < 0:
+                raise ValueError("Входящий остаток не может быть отрицательным. Пример: 16,00")
+            s["rk2s_opening"] = format(value.quantize(_D("0.01")), "f")
+        except Exception as e:
+            await _rk2_invalid(msg, uid, ValueError("Не понял остаток. Введите, например: 16,00 или 1 000,50"), step); return
+        await _rk2_after_field(msg, uid, "rk2s_count_choice"); return
+    if step == "rk2s_count_input":
+        cleaned = text.strip()
+        if not re.fullmatch(r"\d{1,2}", cleaned) or not (0 <= int(cleaned) <= 10):
+            await _rk2_invalid(msg, uid, ValueError("Введите число платежей от 0 до 10, например: 3"), step); return
+        s["rk2s_op_count"] = int(cleaned)
+        await _rk2s_after_count(msg, uid); return
+    if step == "rk2s_op_date":
+        cleaned = " ".join(text.split())
+        parsed = None
+        for fmt in ("%d.%m.%Y", "%Y-%m-%d"):
+            try:
+                parsed = datetime.strptime(cleaned, fmt).date(); break
+            except ValueError:
+                continue
+        if parsed is None:
+            await _rk2_invalid(msg, uid, ValueError("Не понял дату операций. Введите, например: 03.11.2026"), step); return
+        start, end = s.get("rk2s_period_start"), s.get("rk2s_period_end")
+        if start and end and not (start <= parsed <= end):
+            await _rk2_invalid(msg, uid, ValueError(f"Дата вне периода {start:%d.%m.%Y}–{end:%d.%m.%Y}. Введите, например: {start:%d.%m.%Y}"), step); return
+        receipt_dates = s.get("rk2s_receipt_dates") or []
+        if receipt_dates and str(parsed.isoformat()) != str(receipt_dates[0]):
+            from datetime import date as _date
+            first = _date.fromisoformat(str(receipt_dates[0]))
+            await _rk2_invalid(msg, uid, ValueError(f"Случайные операции выписки должны быть в тот же день, что и загруженный чек ({first:%d.%m.%Y}), иначе движок честно откажет. Выберите эту дату или «День загруженного чека»."), step); return
+        s["rk2s_op_date"] = parsed
+        s.pop("rk2_editing", None)
+        await _rk2_show(msg, uid, "rk2s_summary"); return
+
+    # ── Выписка: редактор операций ──
+    if step == "rk2s_op_amount":
+        cleaned = re.sub(r"[\s\u00a0\u202f]", "", text.strip()).replace(",", ".")
+        try:
+            from decimal import Decimal as _D
+            value = _D(cleaned)
+            if value <= 0:
+                raise ValueError
+            draft = s.setdefault("rk2s_op_draft", {})
+            draft["amount"] = format(value.quantize(_D("0.01")), "f")
+        except Exception:
+            await _rk2_invalid(msg, uid, ValueError("Не понял сумму. Введите, например: 1 500,00"), step); return
+        await _rk2_show(msg, uid, "rk2s_op_dt_choice"); return
+    if step == "rk2s_op_dt_input":
+        cleaned = " ".join(text.split())
+        parsed = None
+        for fmt in ("%d.%m.%Y %H:%M", "%d.%m.%Y %H:%M:%S"):
+            try:
+                parsed = datetime.strptime(cleaned, fmt); break
+            except ValueError:
+                continue
+        if parsed is None:
+            await _rk2_invalid(msg, uid, ValueError("Не понял дату и время. Введите, например: 04.11.2026 12:40"), step); return
+        draft = s.setdefault("rk2s_op_draft", {})
+        draft["datetime"] = parsed
+        await _rk2_show(msg, uid, "rk2s_op_detail"); return
+    if step == "rk2s_op_detail":
+        draft = s.setdefault("rk2s_op_draft", {})
+        kind = draft.get("kind")
+        if kind in ("sbp_out", "sbp_in"):
+            try:
+                draft["phone"] = _rk2_parse_phone(text)
+            except ValueError as e:
+                await _rk2_invalid(msg, uid, e, step); return
+        elif kind == "card":
+            raw = text.strip()
+            digits = re.sub(r"\D", "", raw)
+            if "*" in raw or "•" in raw:
+                draft["card"] = raw
+            elif len(digits) == 16:
+                draft["card"] = f"{digits[:4]} **** **** {digits[-4:]}"
+            else:
+                await _rk2_invalid(msg, uid, ValueError("Не понял карту. Введите 16 цифр или маску, например: 2200 **** **** 9515"), step); return
+        elif kind == "topup":
+            digits = re.sub(r"\D", "", text)
+            if digits:
+                draft["card"] = digits[-4:]
+        else:
+            draft["description"] = " ".join(text.split())
+        _rk2s_finish_op(s)
+        await _rk2_show(msg, uid, "rk2s_ops_editor"); return
+    if step == "rk2s_upload":
+        await _rk2_show(msg, uid, "rk2s_upload",
+                        prefix="⚠️ Пришлите чек файлом PDF (по одному) или нажмите «Готово».\n\n")
+        return
+
+
+@router.message(F.document)
+async def rk2_handle_document(msg: Message):
+    uid = msg.from_user.id
+    if not is_ok(uid):
+        return
+    s = sessions.get(uid)
+    if not s or s.get("step") != "rk2s_upload":
+        return
+    doc = msg.document
+    if doc is None or not (doc.file_name or "").lower().endswith(".pdf"):
+        await _rk2_show(msg, uid, "rk2s_upload",
+                        prefix="⚠️ Нужен именно PDF-чека Рокета. Пришлите файл PDF по одному.\n\n")
+        return
+    total = int(s.get("rk2s_op_count") or 0)
+    uploaded_paths = s.setdefault("rk2s_receipt_paths", [])
+    if len(uploaded_paths) >= total and total > 0:
+        await _rk2_show(msg, uid, "rk2s_upload",
+                        prefix=(f"⚠️ Уже загружено чеков: {len(uploaded_paths)} — этого достаточно "
+                                f"для {total} платежей. Нажмите «Готово».\n\n"))
+        return
+    import tempfile as _tf
+    upload_dir = s.get("rk2s_upload_dir")
+    if not upload_dir:
+        upload_dir = _tf.mkdtemp(prefix="checketop_rocket_stmt_")
+        s["rk2s_upload_dir"] = upload_dir
+    from pathlib import Path as _Path
+    local_path = _Path(upload_dir) / f"receipt_{len(uploaded_paths) + 1}_{doc.file_id[:12]}.pdf"
+    try:
+        tg_file = await bot.get_file(doc.file_id)
+        await bot.download_file(tg_file.file_path, destination=str(local_path))
+        operation = await run_gen(ck().import_rocket_receipt, local_path)
+        value = operation.get("datetime") or operation.get("date") or operation.get("dt")
+        if hasattr(value, "date"):
+            receipt_date = value.date()
+        elif hasattr(value, "isoformat"):
+            receipt_date = value
+        else:
+            receipt_date = datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
+    except Exception as e:
+        try:
+            local_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        await _rk2_show(msg, uid, "rk2s_upload",
+                        prefix=(f"Не получилось прочитать чек: {html.escape(str(e))[:120]}\n"
+                                "Пришлите настоящий чек Рокета в PDF или нажмите «Готово».\n\n"))
+        return
+    start, end = s.get("rk2s_period_start"), s.get("rk2s_period_end")
+    if start and end and not (start <= receipt_date <= end):
+        s["rk2s_pending_path"] = str(local_path)
+        s["rk2s_pending_date"] = receipt_date.isoformat()
+        await _rk2_show(msg, uid, "rk2s_upload_pending")
+        return
+    uploaded_paths.append(str(local_path))
+    s.setdefault("rk2s_receipt_dates", []).append(receipt_date.isoformat())
+    prefix = (f"Загружено чеков: {len(uploaded_paths)}"
+              + (" — достаточно, можно нажимать «Готово»." if len(uploaded_paths) >= total else "")
+              + "\n\n")
+    await _rk2_show(msg, uid, "rk2s_upload", prefix=prefix)
+
+
 
 @router.error()
 async def on_error(event):

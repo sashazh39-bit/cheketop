@@ -163,6 +163,7 @@ def gen_rocket_sbp(*,
     amount: int | str,
     operation_dt=None,
     output_path=None,
+    sender_account: str | None = None,
 ):
     """Чек Рокет СБП — generate_rocket из rocket_lib/engine.py."""
     from datetime import datetime, timezone, timedelta
@@ -179,6 +180,7 @@ def gen_rocket_sbp(*,
         recipient_phone=recipient_phone,
         recipient_bank=recipient_bank,
         output_path=output_path,
+        sender_account=sender_account,
     )
     return path.read_bytes() if output_path is None else path.read_bytes()
 
@@ -190,6 +192,7 @@ def gen_rocket_card(*,
     amount: int | str,
     operation_dt=None,
     output_path=None,
+    sender_account: str | None = None,
 ):
     """Чек Рокет карта — generate_rocket_card из rocket_lib/engine.py."""
     from datetime import datetime, timezone, timedelta
@@ -204,6 +207,7 @@ def gen_rocket_card(*,
         recipient_card=recipient_card,
         recipient_bank=recipient_bank,
         output_path=output_path,
+        sender_account=sender_account,
     )
     return path.read_bytes()
 
@@ -243,3 +247,55 @@ def gen_rocket_statement(*,
         output_path=output_path,
     )
     return path.read_bytes()
+
+
+def gen_rocket_statement_full(*, period_start, period_end, issue_date=None,
+                              holder_name: str, phone: str = "",
+                              account=None, account_tail=None,
+                              opening_balance="0", operation_count: int = 0,
+                              receipt_paths: list | None = None,
+                              operations: list | None = None,
+                              fill_random: bool = True,
+                              operation_date=None,
+                              output_path=None) -> bytes:
+    """Выписка Рокета с полными kwargs как в боте этого Мака
+    (_statement_engine_kwargs): receipt_paths / fill_random / operation_date."""
+    _rocket()
+    from rocket_statement import generate_rocket_statement
+    kwargs = dict(
+        period_start=period_start, period_end=period_end,
+        holder_name=holder_name, opening_balance=opening_balance,
+        fill_random=bool(fill_random), operation_count=int(operation_count or 0),
+        receipt_paths=list(receipt_paths or []),
+    )
+    kwargs["issue_date"] = issue_date if issue_date is not None else period_end
+    kwargs["account"] = account
+    kwargs["account_tail"] = account_tail
+    kwargs["random_account_tail"] = False
+    kwargs["operation_date"] = operation_date
+    kwargs["phone"] = phone or None
+    if operations is not None:
+        kwargs["operations"] = operations
+        kwargs["fill_random"] = False
+        kwargs["operation_count"] = len(operations)
+        kwargs["receipt_paths"] = []
+    path = generate_rocket_statement(output_path=output_path, **kwargs)
+    return path.read_bytes()
+
+
+def import_rocket_receipt(path) -> dict:
+    """PDF чека Рокета -> операция выписки (rocket_statement.operation_from_receipt)."""
+    _rocket()
+    from rocket_statement import operation_from_receipt
+    result = operation_from_receipt(str(path))
+    if not isinstance(result, dict):
+        raise TypeError("operation_from_receipt вернул не словарь операции")
+    return result
+
+
+def rocket_stmt_module():
+    import importlib, sys
+    lib = _LIB.parent / "rocket_lib"
+    if str(lib) not in sys.path:
+        sys.path.insert(0, str(lib))
+    return importlib.import_module("rocket_statement")
