@@ -139,3 +139,70 @@ def alfa_fields(receipt_type: str = "sbp") -> list[dict]:
     svc = alfa_scratch()
     rtype = svc.RECEIPT_TYPES[receipt_type]
     return list(rtype.get("left", [])) + list(rtype.get("right", []))
+
+
+# ── Рокет ─────────────────────────────────────────────────────────────
+
+def _rocket():
+    """Ленивый импорт Рокет-движка из ./rocket_lib/."""
+    if "rocket" not in _cache:
+        import importlib, sys
+        rocket_lib = _LIB.parent / "rocket_lib"
+        if str(rocket_lib) not in sys.path:
+            sys.path.insert(0, str(rocket_lib))
+        _cache["rocket"] = importlib.import_module("engine")
+    return _cache["rocket"]
+
+
+def gen_rocket_sbp(*,
+    sender_name: str,
+    sender_phone: str,
+    recipient_name: str,
+    recipient_phone: str,
+    recipient_bank: str = "Сбербанк",
+    amount: int | str,
+    operation_dt=None,
+    output_path=None,
+):
+    """Чек Рокет СБП — generate_rocket из rocket_lib/engine.py."""
+    from datetime import datetime, timezone, timedelta
+    MSK = timezone(timedelta(hours=3))
+    eng = _rocket()
+    if operation_dt is None:
+        operation_dt = datetime.now(MSK)
+    path = eng.generate_rocket(
+        amount=str(amount),
+        operation_dt=operation_dt,
+        sender_name=sender_name,
+        sender_phone=sender_phone,
+        recipient_name=recipient_name,
+        recipient_phone=recipient_phone,
+        recipient_bank=recipient_bank,
+        output_path=output_path,
+    )
+    return path.read_bytes() if output_path is None else path.read_bytes()
+
+
+def gen_rocket_card(*,
+    sender_name: str,
+    recipient_card: str,
+    recipient_bank: str | None = None,
+    amount: int | str,
+    operation_dt=None,
+    output_path=None,
+):
+    """Чек Рокет карта — generate_rocket_card из rocket_lib/engine.py."""
+    from datetime import datetime, timezone, timedelta
+    MSK = timezone(timedelta(hours=3))
+    eng = _rocket()
+    if operation_dt is None:
+        operation_dt = datetime.now(MSK)
+    path = eng.generate_rocket_card(
+        amount=str(amount),
+        operation_dt=operation_dt,
+        sender_name=sender_name,
+        recipient_card=recipient_card,
+        recipient_bank=recipient_bank,
+        output_path=output_path,
+    )
+    return path.read_bytes()

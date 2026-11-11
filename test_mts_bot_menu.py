@@ -15,7 +15,7 @@ ADMIN = bot.ADMIN_ID
 USER = 123456001
 USER_GRANTED = 123456002
 
-BANK_KEYS = ["mts", "wb", "vtb", "alfa", "tbank", "rshb", "ozon", "yandex"]
+BANK_KEYS = ["mts", "wb", "vtb", "alfa", "tbank", "rocket", "rshb", "ozon", "yandex"]
 FLOW_CALLBACKS = {
     "new", "new_card", "new_stmt", "new_wb", "new_vtb", "new_rshb",
     "new_ozon", "ozon_edit", "new_yandex", "new_yrcpt",
@@ -90,6 +90,7 @@ class MenuSmoke(unittest.TestCase):
             "vtb": {"ck_vtb_sbp", "new_vtbcard", "home"},
             "alfa": {"ck_alfa_sbp", "home"},
             "tbank": {"ck_tbank_sbp", "home"},
+            "rocket": {"ck_rocket_sbp", "ck_rocket_card", "home"},
             "rshb": {"new_rshb", "home"},
             # без флага ozon_v2 — старый flow (rollback)
             "ozon": {"new_ozon", "ozon_edit", "home"},
