@@ -3817,35 +3817,70 @@ async def handle_text(msg: Message):
     if s["step"] == "rk_stmt_name":
         name = msg.text.strip()
         if not name:
-            await edit(msg, "\u274c Пустое имя. Например: <code>Иванов Иван Иванович</code>",
-                       kb([(u"\u274c Отмена", "cancel")]), uid); return
+            await edit(msg, "\u274c Имя не может быть пустым.", kb([(u"\u274c Отмена","cancel")]), uid); return
         s["rk_stmt_name"] = name
         s["step"] = "rk_stmt_balance"
         await edit(msg,
             f"\U0001f464 <b>{name}</b> \u2705\n\n"
             "\U0001f4b0 <b>Входящий остаток (рубли):</b>\n"
-            "Например: <code>15000</code>\n"
-            "(<i>баланс на начало периода</i>)",
-            kb([(u"\U0001f3b2 Случайный", "rk_stmt_bal_auto")], [(u"\u274c Отмена", "cancel")]), uid); return
+            "Например: <code>15000</code>\n(<i>баланс на начало периода</i>)",
+            kb([(u"\U0001f3b2 Случайный", "rk_stmt_bal_auto")], [(u"\u274c Отмена","cancel")]), uid); return
 
     if s["step"] == "rk_stmt_balance":
         t = str(_parse_rub_amount(msg.text) or "")
         if not t or int(t) < 0:
             await edit(msg, "\u274c Введи сумму >= 0, например: <code>15000</code>",
-                       kb([(u"\u274c Отмена", "cancel")]), uid); return
+                       kb([(u"\u274c Отмена","cancel")]), uid); return
         s["rk_stmt_balance"] = int(t)
-        s["step"] = "rk_stmt_income"
-        await edit(msg,
-            f"\U0001f4b0 Остаток: <b>{int(t):,} ₽</b> \u2705\n\n"
-            "\U0001f4c5 <b>Сумма прихода за период (₽):</b>\n"
-            "Например: <code>5000</code> — или 0 если не нужен",
-            kb([(u"0 — нет операций", "rk_stmt_no_ops")], [(u"\u274c Отмена", "cancel")]), uid); return
+        s.setdefault("rk_stmt_ops", [])
+        s["step"] = "rk_stmt_ops_menu"
+        await edit(msg, _rk_stmt_ops_text(s), _rk_stmt_ops_menu(s), uid); return
 
-    if s["step"] == "rk_stmt_income":
-        t = str(_parse_rub_amount(msg.text) or "0")
-        s["rk_stmt_income"] = int(t) if int(t) > 0 else 0
-        s["step"] = "gen_busy"
-        await _rocket_stmt_finish(msg, uid); return
+    if s["step"] == "rk_stmt_ops_menu":
+        return  # этот шаг управляется только кнопками
+
+    if s["step"] == "rk_stmt_op_amount":
+        t = str(_parse_rub_amount(msg.text) or "")
+        if not t or int(t) <= 0:
+            await edit(msg, "\u274c Введи сумму > 0, например: <code>5000</code>",
+                       kb([(u"\u274c Отмена","cancel")]), uid); return
+        s["rk_stmt_cur_amount"] = int(t)
+        s["step"] = "rk_stmt_op_time"
+        from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+        _msk = _tz(_td(hours=3))
+        default_time = _dt.now(_msk).strftime("%d.%m.%Y %H:%M")
+        await edit(msg,
+            f"\U0001f4b0 Сумма: <b>{int(t):,} ₽</b> \u2705\n\n"
+            "\U0001f551 <b>Дата и время операции (МСК):</b>\n"
+            f"Формат: <code>ДД.ММ.ГГГГ ЧЧ:ММ</code>\n"
+            f"Например: <code>{default_time}</code>",
+            kb([(u"\U0001f552 Сейчас", "rk_stmt_op_now")], [(u"\u274c Отмена","cancel")]), uid); return
+
+    if s["step"] == "rk_stmt_op_time":
+        import re as _re
+        raw = msg.text.strip()
+        m = _re.match(r"(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2})", raw)
+        if not m:
+            await edit(msg, "\u274c Формат: <code>ДД.ММ.ГГГГ ЧЧ:ММ</code>, например <code>11.11.2026 10:30</code>",
+                       kb([(u"\u274c Отмена","cancel")]), uid); return
+        day, hm = m.group(1), m.group(2)
+        # rocket_statement ожидает "YYYY-MM-DD HH:MM"
+        d_parts = day.split(".")
+        s["rk_stmt_cur_time"] = f"{d_parts[2]}-{d_parts[1]}-{d_parts[0]} {hm}"
+        s["step"] = "rk_stmt_op_phone"
+        await edit(msg,
+            f"\U0001f551 Время: <b>{day} {hm}</b> \u2705\n\n"
+            "\U0001f4de <b>Телефон (для СБП):</b>\n"
+            "Например: <code>+7 963 297-20-08</code>\n"
+            "<i>или пропусти — подставится случайный</i>",
+            kb([(u"\U0001f3b2 Случайный телефон", "rk_stmt_op_phone_auto")], [(u"\u274c Отмена","cancel")]), uid); return
+
+    if s["step"] == "rk_stmt_op_phone":
+        phone_raw = msg.text.strip()
+        ph = format_phone(phone_raw) or phone_raw
+        _finish_op(s, ph)
+        s["step"] = "rk_stmt_ops_menu"
+        await edit(msg, _rk_stmt_ops_text(s), _rk_stmt_ops_menu(s), uid); return
 
     # ── РОКЕТ текстовые шаги ──
     if s["step"] in ("ck_rocket_sbp_name", "ck_rocket_card_name"):
@@ -5932,51 +5967,161 @@ async def cb_rk_card(cb: CallbackQuery):
     await _rocket_card_finish(cb, uid)
 
 
+# ── РОКЕТ ВЫПИСКА: полный флоу с операциями ───────────────────────────────
+# Флоу: ФИО → входящий остаток → добавляем операции по одной → генерация
+
+def _rk_stmt_ops_menu(s: dict):
+    """Клавиатура состояния ввода операций."""
+    ops = s.get("rk_stmt_ops", [])
+    n = len(ops)
+    rows = []
+    if n > 0:
+        rows.append([(f"\u2714 Готово ({n} оп.)", "rk_stmt_done")])
+    rows.append([(u"\U0001f4b0 + Приход", "rk_stmt_add_in"),
+                 (u"\U0001f4b8 + Расход", "rk_stmt_add_out")])
+    if n > 0:
+        rows.append([(u"\U0001f5d1 Удалить последнюю", "rk_stmt_del_last")])
+    rows.append([(u"\u274c Отмена", "cancel")])
+    return kb(*rows)
+
+def _rk_stmt_ops_text(s: dict) -> str:
+    ops = s.get("rk_stmt_ops", [])
+    holder = s.get("rk_stmt_name","")
+    bal = s.get("rk_stmt_balance", 0)
+    lines = [f"\U0001f680 <b>Выписка Рокетбанк</b>",
+             f"\U0001f464 {holder}",
+             f"\U0001f4b0 Входящий: {bal:,} ₽", ""]
+    if ops:
+        lines.append(f"<b>Операций: {len(ops)}</b>")
+        for i, op in enumerate(ops[-5:], 1):
+            sign = "+" if op["direction"]=="INCOME" else "-"
+            lines.append(f"  {i}. {sign}{int(op['amount']):,} ₽  {op['datetime'][11:16]}  ({op.get('phone','')})")
+        if len(ops) > 5:
+            lines.append(f"  ... ещё {len(ops)-5}")
+    else:
+        lines.append("<i>Операций пока нет — добавь хотя бы одну</i>")
+    lines.append("")
+    lines.append("Добавь операции или нажми <b>Готово</b>:")
+    return "\n".join(lines)
+
+
 @router.callback_query(F.data == "ck_rocket_stmt")
 async def cb_ck_rocket_stmt(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid): await cb.answer("Нет доступа"); return
-    sessions[uid] = {"step": "rk_stmt_name", "mid": cb.message.message_id}
+    sessions[uid] = {"step": "rk_stmt_name", "mid": cb.message.message_id, "rk_stmt_ops": []}
     await edit(cb,
         "\U0001f680 <b>Выписка Рокетбанк</b>\n\n"
-        "\U0001f464 <b>ФИО держателя карты:</b>\n"
+        "\U0001f464 <b>ФИО держателя:</b>\n"
         "Например: <code>Иванов Иван Иванович</code>",
         kb([(u"\u2b05 В банк", "bankmenu:rocket")], [(u"\u274c Отмена", "cancel")]), uid)
     await cb.answer()
 
 
+@router.callback_query(F.data.in_({"rk_stmt_add_in", "rk_stmt_add_out"}))
+async def cb_rk_stmt_add_op(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    s = sessions.get(uid)
+    if not s: await cb.answer("Начни заново"); return
+    direction = "INCOME" if cb.data == "rk_stmt_add_in" else "OUTCOME"
+    s["rk_stmt_adding"] = direction
+    s["step"] = "rk_stmt_op_amount"
+    sign = "приход" if direction == "INCOME" else "расход"
+    await edit(cb,
+        f"\U0001f4b0 <b>Сумма ({sign}), рубли:</b>\n"
+        "Например: <code>5000</code>",
+        kb([(u"\u274c Отмена", "cancel")]), uid)
+    await cb.answer()
+
+
+@router.callback_query(F.data == "rk_stmt_del_last")
+async def cb_rk_stmt_del_last(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    s = sessions.get(uid)
+    if not s: await cb.answer("Начни заново"); return
+    ops = s.get("rk_stmt_ops", [])
+    if ops: ops.pop()
+    s["step"] = "rk_stmt_ops_menu"
+    await edit(cb, _rk_stmt_ops_text(s), _rk_stmt_ops_menu(s), uid)
+    await cb.answer("Удалена ✓")
+
+
+@router.callback_query(F.data == "rk_stmt_done")
+async def cb_rk_stmt_done(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    s = sessions.get(uid)
+    if not s: await cb.answer("Начни заново"); return
+    if not s.get("rk_stmt_ops"):
+        await cb.answer("Добавь хотя бы одну операцию"); return
+    s["step"] = "gen_busy"
+    await cb.answer()
+    await _rocket_stmt_finish(cb, uid)
+
+
 async def _rocket_stmt_finish(msg_or_cb, uid):
     s = sessions.get(uid)
-    if not s: await bot.send_message(uid, "\u274c Сессия устарела — /start", reply_markup=main_menu(uid)); return
-    await _progress_action(uid); qmsg = await _queue_notice(uid)
+    if not s:
+        await bot.send_message(uid, "\u274c Сессия устарела — /start", reply_markup=main_menu(uid))
+        return
+    await _progress_action(uid)
+    qmsg = await _queue_notice(uid)
     try:
-        holder = bank_name(s.get("rk_stmt_name", ""))
-        if holder and not holder.endswith("."): holder_clean = holder
-        else: holder_clean = holder
-        balance = str(s.get("rk_stmt_balance", "0"))
+        holder = s.get("rk_stmt_name", "")
+        balance = str(s.get("rk_stmt_balance", 0))
+        raw_ops = s.get("rk_stmt_ops", [])
+        # Формат операций как в checketop_bridge.py
         ops = []
-        # Одна операция на сумму прихода (если задана)
-        income_raw = s.get("rk_stmt_income", "")
-        if income_raw:
-            from datetime import datetime
-            now = datetime.now().replace(second=0, microsecond=0)
-            ops.append({"kind": "sbp_in", "datetime": now.strftime("%Y-%m-%d %H:%M"), "amount": str(income_raw)})
+        for op in raw_ops:
+            ops.append({
+                "kind": "sbp_in" if op["direction"] == "INCOME" else "sbp_out",
+                "datetime": op["datetime"],
+                "amount": str(op["amount"]),
+                "phone": op.get("phone", ""),
+            })
         pdf = await run_gen(ck().gen_rocket_statement,
-                            holder_name=holder_clean,
+                            holder_name=holder,
                             opening_balance=balance,
                             operations=ops,
-                            account=s.get("rk_stmt_acc", ""),
-                            phone=s.get("rk_stmt_phone", ""))
+                            operation_count=len(ops),
+                            account=s.get("rk_stmt_acc", ""))
     except Exception as e:
         await _clear_note(qmsg)
-        await bot.send_message(uid, f"\u274c Ошибка выписки Рокет: <code>{html.escape(str(e))[:300]}</code>", reply_markup=main_menu(uid))
-        sessions.pop(uid, None); return
-    await _clear_note(qmsg); sessions.pop(uid, None)
+        await bot.send_message(uid, f"\u274c Ошибка выписки Рокет:\n<code>{html.escape(str(e))[:300]}</code>",
+                               reply_markup=main_menu(uid))
+        sessions.pop(uid, None)
+        return
+    await _clear_note(qmsg)
+    sessions.pop(uid, None)
     fn = f"rocket_stmt_{now_msk().strftime('%d-%m-%y_%H-%M')}.pdf"
+    total_in  = sum(int(o["amount"]) for o in raw_ops if o["direction"] == "INCOME")
+    total_out = sum(int(o["amount"]) for o in raw_ops if o["direction"] == "OUTCOME")
+    cap = (f"\U0001f680 Выписка Рокетбанк\n"
+           f"\U0001f464 {holder}\n"
+           f"\U0001f4b0 Вход: {int(balance):,} ₽ | +{total_in:,} | -{total_out:,} ₽")
     await bot.send_document(uid, BufferedInputFile(pdf, filename=fn),
-        caption=f"\U0001f680 Выписка Рокетбанк\n\U0001f464 {holder_clean}",
-        reply_markup=kb([(u"\U0001f504 Ещё выписку", "ck_rocket_stmt")], [(u"\U0001f3e0 Меню", "home")]))
+        caption=cap,
+        reply_markup=kb([(u"\U0001f504 Новая выписка", "ck_rocket_stmt")], [(u"\U0001f3e0 Меню", "home")]))
+    if gfeat("log_all_banks"):
+        data["logs"].append({"uid": uid, "type": "rocket_stmt", "ops": len(raw_ops), "ts": now_msk().isoformat()})
 
+
+def _finish_op(s: dict, phone: str = ""):
+    """Сохранить текущую операцию в список."""
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    _msk = _tz(_td(hours=3))
+    ops = s.setdefault("rk_stmt_ops", [])
+    ops.append({
+        "direction": s.get("rk_stmt_adding", "OUTCOME"),
+        "amount": s.get("rk_stmt_cur_amount", 0),
+        "datetime": s.get("rk_stmt_cur_time", _dt.now(_msk).strftime("%Y-%m-%d %H:%M")),
+        "phone": phone or "",
+    })
+    s.pop("rk_stmt_adding", None)
+    s.pop("rk_stmt_cur_amount", None)
+    s.pop("rk_stmt_cur_time", None)
 
 
 @router.callback_query(F.data == "rk_stmt_bal_auto")
@@ -5987,25 +6132,43 @@ async def cb_rk_stmt_bal_auto(cb: CallbackQuery):
     if not s: await cb.answer("Начни заново"); return
     bal = random.randint(5000, 50000)
     s["rk_stmt_balance"] = bal
-    s["step"] = "rk_stmt_income"
-    await edit(cb,
-        f"\U0001f4b0 Остаток: <b>{bal:,} ₽</b> \u2705\n\n"
-        "\U0001f4c5 <b>Сумма прихода за период (₽):</b>\n"
-        "Например: <code>5000</code> — или 0 если не нужен",
-        kb([(u"0 — нет операций", "rk_stmt_no_ops")], [(u"\u274c Отмена", "cancel")]), uid)
-    await cb.answer()
+    s.setdefault("rk_stmt_ops", [])
+    s["step"] = "rk_stmt_ops_menu"
+    await edit(cb, _rk_stmt_ops_text(s), _rk_stmt_ops_menu(s), uid)
+    await cb.answer(f"Остаток {bal:,} ₽")
 
 
-@router.callback_query(F.data == "rk_stmt_no_ops")
-async def cb_rk_stmt_no_ops(cb: CallbackQuery):
+@router.callback_query(F.data == "rk_stmt_op_now")
+async def cb_rk_stmt_op_now(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid): await cb.answer("Нет доступа"); return
     s = sessions.get(uid)
     if not s: await cb.answer("Начни заново"); return
-    s["rk_stmt_income"] = 0
-    s["step"] = "gen_busy"
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    _msk = _tz(_td(hours=3))
+    s["rk_stmt_cur_time"] = _dt.now(_msk).strftime("%Y-%m-%d %H:%M")
+    s["step"] = "rk_stmt_op_phone"
+    sign = "приход" if s.get("rk_stmt_adding") == "INCOME" else "расход"
+    await edit(cb,
+        f"\U0001f551 Время: <b>сейчас (МСК)</b> \u2705\n\n"
+        "\U0001f4de <b>Телефон (для СБП):</b>\n"
+        "Например: <code>+7 963 297-20-08</code>\n"
+        "<i>или пропусти — подставится случайный</i>",
+        kb([(u"\U0001f3b2 Случайный телефон", "rk_stmt_op_phone_auto")], [(u"\u274c Отмена","cancel")]), uid)
     await cb.answer()
-    await _rocket_stmt_finish(cb, uid)
+
+
+@router.callback_query(F.data == "rk_stmt_op_phone_auto")
+async def cb_rk_stmt_op_phone_auto(cb: CallbackQuery):
+    uid = cb.from_user.id
+    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    s = sessions.get(uid)
+    if not s: await cb.answer("Начни заново"); return
+    ph = f"+7 9{random.randint(10,99)} {random.randint(100,999)}-{random.randint(10,99)}-{random.randint(10,99)}"
+    _finish_op(s, ph)
+    s["step"] = "rk_stmt_ops_menu"
+    await edit(cb, _rk_stmt_ops_text(s), _rk_stmt_ops_menu(s), uid)
+    await cb.answer("Добавлено ✓")
 
 @router.error()
 async def on_error(event):
