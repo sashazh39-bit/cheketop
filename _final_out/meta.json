@@ -1,0 +1,974 @@
+{
+ "generated_at": "2026-11-07T04:49:09.835634+03:00",
+ "checks": [
+  {
+   "file": "mts_A_replica.pdf",
+   "bank": "MTS",
+   "kind": "replica",
+   "donor": "file25.pdf",
+   "expect": {
+    "dt_text": "28.10.2026 07:29:57 (UTC+3)",
+    "name": "Семён Евгеньевич О",
+    "phone": "+7 (982) 638-95-63",
+    "bank": "ЮМани",
+    "amount": "13,00 ₽",
+    "account": "40914 81070 00021 29508",
+    "tr": "019242983060"
+   },
+   "op_id": "A6301042952073040B10040011880703",
+   "extra": {
+    "tr": "019242983060",
+    "account": "40914 81070 00021 29508",
+    "dt": "2026-10-28T07:29:57"
+   },
+   "md5": "f59d236a2301d9900e6d33e907e468a5",
+   "size": 49851,
+   "warns": [],
+   "deflate": [
+    {
+     "obj": 4,
+     "status": "OK",
+     "clen": 100,
+     "dlen": 2162
+    },
+    {
+     "obj": 5,
+     "status": "OK",
+     "clen": 93,
+     "dlen": 6486
+    },
+    {
+     "obj": 6,
+     "status": "OK",
+     "clen": 407,
+     "dlen": 1320
+    },
+    {
+     "obj": 7,
+     "status": "OK",
+     "clen": 27,
+     "dlen": 3960
+    },
+    {
+     "obj": 8,
+     "status": "OK",
+     "clen": 99,
+     "dlen": 1089
+    },
+    {
+     "obj": 9,
+     "status": "OK",
+     "clen": 26,
+     "dlen": 3267
+    },
+    {
+     "obj": 10,
+     "status": "OK",
+     "clen": 396,
+     "dlen": 1258
+    },
+    {
+     "obj": 11,
+     "status": "OK",
+     "clen": 27,
+     "dlen": 3774
+    },
+    {
+     "obj": 12,
+     "status": "OK",
+     "clen": 224,
+     "dlen": 1560
+    },
+    {
+     "obj": 13,
+     "status": "OK",
+     "clen": 27,
+     "dlen": 4680
+    },
+    {
+     "obj": 14,
+     "status": "OK",
+     "clen": 55,
+     "dlen": 924
+    },
+    {
+     "obj": 15,
+     "status": "OK",
+     "clen": 26,
+     "dlen": 2772
+    },
+    {
+     "obj": 16,
+     "status": "OK",
+     "clen": 56,
+     "dlen": 1056
+    },
+    {
+     "obj": 17,
+     "status": "OK",
+     "clen": 26,
+     "dlen": 3168
+    },
+    {
+     "obj": 18,
+     "status": "OK",
+     "clen": 282,
+     "dlen": 1089
+    },
+    {
+     "obj": 19,
+     "status": "OK",
+     "clen": 26,
+     "dlen": 3267
+    },
+    {
+     "obj": 20,
+     "status": "OK",
+     "clen": 39,
+     "dlen": 858
+    },
+    {
+     "obj": 21,
+     "status": "OK",
+     "clen": 24,
+     "dlen": 2574
+    },
+    {
+     "obj": 22,
+     "status": "OK",
+     "clen": 366,
+     "dlen": 1089
+    },
+    {
+     "obj": 23,
+     "status": "OK",
+     "clen": 26,
+     "dlen": 3267
+    },
+    {
+     "obj": 3,
+     "status": "OK",
+     "clen": 474,
+     "dlen": 2550
+    },
+    {
+     "obj": 24,
+     "status": "OK",
+     "clen": 11,
+     "dlen": 3
+    },
+    {
+     "obj": 27,
+     "status": "OK",
+     "clen": 4812,
+     "dlen": 138498
+    },
+    {
+     "obj": 28,
+     "status": "OK",
+     "clen": 28608,
+     "dlen": 415494
+    },
+    {
+     "obj": 29,
+     "status": "OK",
+     "clen": 773,
+     "dlen": 3265
+    },
+    {
+     "obj": 53,
+     "status": "OK",
+     "clen": 3794,
+     "dlen": 6056
+    },
+    {
+     "obj": 56,
+     "status": "OK",
+     "clen": 561,
+     "dlen": 1417
+    },
+    {
+     "obj": 57,
+     "status": "OK",
+     "clen": 1491,
+     "dlen": 2860
+    },
+    {
+     "obj": 60,
+     "status": "OK",
+     "clen": 277,
+     "dlen": 505
+    },
+    {
+     "obj": 31,
+     "status": "OK",
+     "clen": 1354,
+     "dlen": 3002
+    },
+    {
+     "obj": 65,
+     "status": "OK",
+     "clen": 193,
+     "dlen": 330
+    }
+   ]
+  },
+  {
+   "file": "mts_B_fresh.pdf",
+   "bank": "MTS",
+   "kind": "fresh",
+   "donor": null,
+   "expect": {
+    "dt_text": "07.11.2026 04:48:22 (UTC+3)",
+    "name": "Артём Игоревич К",
+    "phone": "+7 (915) 234-56-78",
+    "bank": "Озон Банк (Ozon)",
+    "amount": "5 432,00 ₽",
+    "account": "40914 81050 00021 24680",
+    "tr": "019549274020"
+   },
+   "op_id": "A63110148001100C0G10120011890101",
+   "extra": {
+    "tr": "019549274020",
+    "account": "40914 81050 00021 24680",
+    "dt": "2026-11-07T04:48:22.370052"
+   },
+   "md5": "194fde3ea7d98a02b57e541e8fd6b76b",
+   "size": 50103,
+   "warns": [],
+   "deflate": [
+    {
+     "obj": 4,
+     "status": "OK",
+     "clen": 100,
+     "dlen": 2162
+    },
+    {
+     "obj": 5,
+     "status": "OK",
+     "clen": 93,
+     "dlen": 6486
+    },
+    {
+     "obj": 6,
+     "status": "OK",
+     "clen": 407,
+     "dlen": 1320
+    },
+    {
+     "obj": 7,
+     "status": "OK",
+     "clen": 27,
+     "dlen": 3960
+    },
+    {
+     "obj": 8,
+     "status": "OK",
+     "clen": 99,
+     "dlen": 1089
+    },
+    {
+     "obj": 9,
+     "status": "OK",
+     "clen": 26,
+     "dlen": 3267
+    },
+    {
+     "obj": 10,
+     "status": "OK",
+     "clen": 396,
+     "dlen": 1258
+    },
+    {
+     "obj": 11,
+     "status": "OK",
+     "clen": 27,
+     "dlen": 3774
+    },
+    {
+     "obj": 12,
+     "status": "OK",
+     "clen": 224,
+     "dlen": 1560
+    },
+    {
+     "obj": 13,
+     "status": "OK",
+     "clen": 27,
+     "dlen": 4680
+    },
+    {
+     "obj": 14,
+     "status": "OK",
+     "clen": 55,
+     "dlen": 924
+    },
+    {
+     "obj": 15,
+     "status": "OK",
+     "clen": 26,
+     "dlen": 2772
+    },
+    {
+     "obj": 16,
+     "status": "OK",
+     "clen": 56,
+     "dlen": 1056
+    },
+    {
+     "obj": 17,
+     "status": "OK",
+     "clen": 26,
+     "dlen": 3168
+    },
+    {
+     "obj": 18,
+     "status": "OK",
+     "clen": 282,
+     "dlen": 1089
+    },
+    {
+     "obj": 19,
+     "status": "OK",
+     "clen": 26,
+     "dlen": 3267
+    },
+    {
+     "obj": 20,
+     "status": "OK",
+     "clen": 39,
+     "dlen": 858
+    },
+    {
+     "obj": 21,
+     "status": "OK",
+     "clen": 24,
+     "dlen": 2574
+    },
+    {
+     "obj": 22,
+     "status": "OK",
+     "clen": 366,
+     "dlen": 1089
+    },
+    {
+     "obj": 23,
+     "status": "OK",
+     "clen": 26,
+     "dlen": 3267
+    },
+    {
+     "obj": 3,
+     "status": "OK",
+     "clen": 474,
+     "dlen": 2550
+    },
+    {
+     "obj": 24,
+     "status": "OK",
+     "clen": 11,
+     "dlen": 3
+    },
+    {
+     "obj": 27,
+     "status": "OK",
+     "clen": 4812,
+     "dlen": 138498
+    },
+    {
+     "obj": 28,
+     "status": "OK",
+     "clen": 28608,
+     "dlen": 415494
+    },
+    {
+     "obj": 29,
+     "status": "OK",
+     "clen": 791,
+     "dlen": 3297
+    },
+    {
+     "obj": 53,
+     "status": "OK",
+     "clen": 3792,
+     "dlen": 6192
+    },
+    {
+     "obj": 56,
+     "status": "OK",
+     "clen": 582,
+     "dlen": 1493
+    },
+    {
+     "obj": 57,
+     "status": "OK",
+     "clen": 1655,
+     "dlen": 3052
+    },
+    {
+     "obj": 60,
+     "status": "OK",
+     "clen": 296,
+     "dlen": 562
+    },
+    {
+     "obj": 31,
+     "status": "OK",
+     "clen": 1385,
+     "dlen": 3057
+    },
+    {
+     "obj": 65,
+     "status": "OK",
+     "clen": 194,
+     "dlen": 330
+    }
+   ]
+  },
+  {
+   "file": "rshb_A_replica.pdf",
+   "bank": "RSHB",
+   "kind": "replica",
+   "donor": "rshb_donor.pdf",
+   "expect": {
+    "dt_text": "06.11.2026, 14:20",
+    "recipient": "Марат Алексеевич П",
+    "phone": "79041075909",
+    "bank": "Совкомбанк",
+    "amount": "10 ₽",
+    "account": "40817...1438",
+    "message": "А а Б б В в Г г Д д Е е Ё ё Ж ж З з И и Й й К к"
+   },
+   "op_id": "B63101120066191D0G10170011890101",
+   "extra": {
+    "dt": "2026-11-06T14:20:06",
+    "created_dt": "2026-11-06T11:20:20"
+   },
+   "md5": "7a9e98055a8c16ab90e62ae14216b0e4",
+   "size": 616334,
+   "warns": [],
+   "deflate": [
+    {
+     "obj": 5,
+     "status": "OK",
+     "clen": 6147,
+     "dlen": 292500
+    },
+    {
+     "obj": 7,
+     "status": "OK",
+     "clen": 2648,
+     "dlen": 97500
+    },
+    {
+     "obj": 8,
+     "status": "OK",
+     "clen": 2553,
+     "dlen": 292500
+    },
+    {
+     "obj": 9,
+     "status": "OK",
+     "clen": 8652,
+     "dlen": 1166400
+    },
+    {
+     "obj": 10,
+     "status": "OK",
+     "clen": 578228,
+     "dlen": 3499200
+    },
+    {
+     "obj": 14,
+     "status": "OK",
+     "clen": 1169,
+     "dlen": 5163
+    },
+    {
+     "obj": 17,
+     "status": "OK",
+     "clen": 28,
+     "dlen": 58
+    },
+    {
+     "obj": 18,
+     "status": "OK",
+     "clen": 2831,
+     "dlen": 5476
+    },
+    {
+     "obj": 21,
+     "status": "OK",
+     "clen": 367,
+     "dlen": 771
+    },
+    {
+     "obj": 22,
+     "status": "OK",
+     "clen": 37,
+     "dlen": 58
+    },
+    {
+     "obj": 23,
+     "status": "OK",
+     "clen": 5149,
+     "dlen": 8868
+    },
+    {
+     "obj": 26,
+     "status": "OK",
+     "clen": 614,
+     "dlen": 1550
+    },
+    {
+     "obj": 3,
+     "status": "OK",
+     "clen": 1317,
+     "dlen": 3044
+    },
+    {
+     "obj": 12,
+     "status": "OK",
+     "clen": 1310,
+     "dlen": 3918
+    },
+    {
+     "obj": 4,
+     "status": "OK",
+     "clen": 35,
+     "dlen": 32
+    },
+    {
+     "obj": 6,
+     "status": "OK",
+     "clen": 35,
+     "dlen": 32
+    }
+   ]
+  },
+  {
+   "file": "rshb_B_fresh.pdf",
+   "bank": "RSHB",
+   "kind": "fresh",
+   "donor": null,
+   "expect": {
+    "dt_text": "07.11.2026, 04:48",
+    "recipient": "Иван Петрович С",
+    "phone": "79261234567",
+    "bank": "Т-Банк",
+    "amount": "2450 ₽",
+    "account": "40817...5678"
+   },
+   "op_id": "B6311014856311020G10120011890101",
+   "extra": {
+    "dt": "2026-11-07T04:48:56.193993",
+    "created_dt": "2026-11-07T01:49:13"
+   },
+   "md5": "fa00b8f94fff793ade346731f960337a",
+   "size": 615856,
+   "warns": [],
+   "deflate": [
+    {
+     "obj": 5,
+     "status": "OK",
+     "clen": 6147,
+     "dlen": 292500
+    },
+    {
+     "obj": 7,
+     "status": "OK",
+     "clen": 2648,
+     "dlen": 97500
+    },
+    {
+     "obj": 8,
+     "status": "OK",
+     "clen": 2553,
+     "dlen": 292500
+    },
+    {
+     "obj": 9,
+     "status": "OK",
+     "clen": 8652,
+     "dlen": 1166400
+    },
+    {
+     "obj": 10,
+     "status": "OK",
+     "clen": 578228,
+     "dlen": 3499200
+    },
+    {
+     "obj": 14,
+     "status": "OK",
+     "clen": 1103,
+     "dlen": 5004
+    },
+    {
+     "obj": 17,
+     "status": "OK",
+     "clen": 28,
+     "dlen": 58
+    },
+    {
+     "obj": 18,
+     "status": "OK",
+     "clen": 3013,
+     "dlen": 5692
+    },
+    {
+     "obj": 21,
+     "status": "OK",
+     "clen": 381,
+     "dlen": 809
+    },
+    {
+     "obj": 22,
+     "status": "OK",
+     "clen": 39,
+     "dlen": 58
+    },
+    {
+     "obj": 23,
+     "status": "OK",
+     "clen": 4612,
+     "dlen": 7976
+    },
+    {
+     "obj": 26,
+     "status": "OK",
+     "clen": 556,
+     "dlen": 1341
+    },
+    {
+     "obj": 3,
+     "status": "OK",
+     "clen": 1317,
+     "dlen": 3044
+    },
+    {
+     "obj": 12,
+     "status": "OK",
+     "clen": 1310,
+     "dlen": 3918
+    },
+    {
+     "obj": 4,
+     "status": "OK",
+     "clen": 35,
+     "dlen": 32
+    },
+    {
+     "obj": 6,
+     "status": "OK",
+     "clen": 35,
+     "dlen": 32
+    }
+   ]
+  },
+  {
+   "file": "vtb_A_replica.pdf",
+   "bank": "VTB",
+   "kind": "replica",
+   "donor": "vtb_donor_plain.pdf",
+   "expect": {
+    "dt_text": "05.11.2026, 21:13",
+    "payer": "Ильяс Ильнурович Х.",
+    "recipient": "Ильяс Ильнурович Х.",
+    "phone": "+7 (967) 739‑98‑49",
+    "bank": "Озон Банк (Ozon)",
+    "amount": "12 ₽",
+    "account": "*0298"
+   },
+   "op_id": "A6309181337142050B10020011881102",
+   "extra": {
+    "dt": "2026-11-05T21:13:37",
+    "created_dt": "2026-11-05T21:13:59"
+   },
+   "md5": "a6b0471a7178d53998496b123f988b7c",
+   "size": 9415,
+   "warns": [],
+   "deflate": [
+    {
+     "obj": 5,
+     "status": "OK",
+     "clen": 1129,
+     "dlen": 6417
+    },
+    {
+     "obj": 8,
+     "status": "OK",
+     "clen": 840,
+     "dlen": 2160
+    },
+    {
+     "obj": 12,
+     "status": "OK",
+     "clen": 516,
+     "dlen": 1319
+    },
+    {
+     "obj": 16,
+     "status": "OK",
+     "clen": 149,
+     "dlen": 2178
+    },
+    {
+     "obj": 17,
+     "status": "OK",
+     "clen": 3926,
+     "dlen": 5508
+    },
+    {
+     "obj": 18,
+     "status": "OK",
+     "clen": 13,
+     "dlen": 137
+    }
+   ]
+  },
+  {
+   "file": "vtb_B_fresh.pdf",
+   "bank": "VTB",
+   "kind": "fresh",
+   "donor": null,
+   "expect": {
+    "dt_text": "07.11.2026, 04:49",
+    "payer": "Михаил Иванович В.",
+    "recipient": "Анна Сергеевна Л.",
+    "phone": "+7 (903) 555‑12‑34",
+    "bank": "Т-Банк",
+    "amount": "1 780 ₽",
+    "account": "*6028",
+    "message": "Оплата ужина"
+   },
+   "op_id": "B6311014907458020G10140011890101",
+   "extra": {
+    "dt": "2026-11-07T04:49:08",
+    "created_dt": "2026-11-07T04:49:19"
+   },
+   "md5": "f44408a8e97dcc40335c2a99fcd4071c",
+   "size": 9503,
+   "warns": [],
+   "deflate": [
+    {
+     "obj": 5,
+     "status": "OK",
+     "clen": 1182,
+     "dlen": 6626
+    },
+    {
+     "obj": 8,
+     "status": "OK",
+     "clen": 840,
+     "dlen": 2160
+    },
+    {
+     "obj": 12,
+     "status": "OK",
+     "clen": 514,
+     "dlen": 1340
+    },
+    {
+     "obj": 16,
+     "status": "OK",
+     "clen": 140,
+     "dlen": 2178
+    },
+    {
+     "obj": 17,
+     "status": "OK",
+     "clen": 4001,
+     "dlen": 5464
+    },
+    {
+     "obj": 18,
+     "status": "OK",
+     "clen": 13,
+     "dlen": 137
+    }
+   ]
+  },
+  {
+   "file": "wb_A_replica.pdf",
+   "bank": "WB",
+   "kind": "replica",
+   "donor": "wb_donor.pdf",
+   "expect": {
+    "dt_text": "04.11.2026 17:02:04",
+    "recipient": "Демид Андреевич В.",
+    "phone": "+7 921 102-58-53",
+    "bank": "Альфа-Банк",
+    "amount": "10 234 ₽",
+    "message": "А а Б б В в Г г Д д Е е Ё ё Ж ж З з И и",
+    "receipt": "Квитанция № 1021680370"
+   },
+   "op_id": "A63081402033620P0B10070011881102",
+   "extra": {
+    "receipt_no": 1021680370,
+    "dt": "2026-11-04T17:02:04"
+   },
+   "md5": "a5434dc13987e75cb7a58c96bbb2d5ce",
+   "size": 52996,
+   "warns": [],
+   "deflate": [
+    {
+     "obj": 7,
+     "status": "OK",
+     "clen": 1068,
+     "dlen": 6590
+    },
+    {
+     "obj": 10,
+     "status": "OK",
+     "clen": 19,
+     "dlen": 236
+    },
+    {
+     "obj": 11,
+     "status": "OK",
+     "clen": 13795,
+     "dlen": 61024
+    },
+    {
+     "obj": 14,
+     "status": "OK",
+     "clen": 263,
+     "dlen": 447
+    },
+    {
+     "obj": 15,
+     "status": "OK",
+     "clen": 50,
+     "dlen": 240
+    },
+    {
+     "obj": 16,
+     "status": "OK",
+     "clen": 16529,
+     "dlen": 65344
+    },
+    {
+     "obj": 19,
+     "status": "OK",
+     "clen": 591,
+     "dlen": 1455
+    },
+    {
+     "obj": 20,
+     "status": "OK",
+     "clen": 34,
+     "dlen": 250
+    },
+    {
+     "obj": 21,
+     "status": "OK",
+     "clen": 14552,
+     "dlen": 62052
+    },
+    {
+     "obj": 24,
+     "status": "OK",
+     "clen": 327,
+     "dlen": 638
+    },
+    {
+     "obj": 3,
+     "status": "OK",
+     "clen": 1193,
+     "dlen": 3676
+    }
+   ]
+  },
+  {
+   "file": "wb_B_fresh.pdf",
+   "bank": "WB",
+   "kind": "fresh",
+   "donor": null,
+   "expect": {
+    "dt_text": "07.11.2026 04:48:25",
+    "recipient": "Егор Владимирович Д.",
+    "phone": "+7 900 111-22-33",
+    "bank": "Сбер",
+    "amount": "999 ₽",
+    "receipt": "Квитанция № 1022074499"
+   },
+   "op_id": "A63110148247730B0G10200011890101",
+   "extra": {
+    "receipt_no": 1022074499,
+    "dt": "2026-11-07T04:48:25.273069"
+   },
+   "md5": "d20762d8887b3e3b5d3462559f781aef",
+   "size": 52022,
+   "warns": [],
+   "deflate": [
+    {
+     "obj": 7,
+     "status": "OK",
+     "clen": 952,
+     "dlen": 5744
+    },
+    {
+     "obj": 10,
+     "status": "OK",
+     "clen": 18,
+     "dlen": 236
+    },
+    {
+     "obj": 11,
+     "status": "OK",
+     "clen": 13524,
+     "dlen": 60704
+    },
+    {
+     "obj": 14,
+     "status": "OK",
+     "clen": 237,
+     "dlen": 371
+    },
+    {
+     "obj": 15,
+     "status": "OK",
+     "clen": 49,
+     "dlen": 240
+    },
+    {
+     "obj": 16,
+     "status": "OK",
+     "clen": 16277,
+     "dlen": 64924
+    },
+    {
+     "obj": 19,
+     "status": "OK",
+     "clen": 549,
+     "dlen": 1322
+    },
+    {
+     "obj": 20,
+     "status": "OK",
+     "clen": 34,
+     "dlen": 250
+    },
+    {
+     "obj": 21,
+     "status": "OK",
+     "clen": 14332,
+     "dlen": 61764
+    },
+    {
+     "obj": 24,
+     "status": "OK",
+     "clen": 322,
+     "dlen": 619
+    },
+    {
+     "obj": 3,
+     "status": "OK",
+     "clen": 1193,
+     "dlen": 3676
+    }
+   ]
+  }
+ ]
+}

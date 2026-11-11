@@ -1,0 +1,1 @@
+Linux little-crimson.ptr.network 5.15.0-124-generic #134-Ubuntu SMP Fri Sep 27 20:20:17 UTC 2024 x86_64 x86_64 x86_64 GNU/Linux
