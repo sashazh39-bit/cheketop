@@ -1119,7 +1119,7 @@ async def cmd_stats(msg: Message):
 @router.callback_query(F.data == "help")
 async def cb_help(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if not gfeat("help_cmd"): await cb.answer("Выключено"); return
     sessions.pop(uid, None)
     await edit(cb, HELP_TEXT, other_menu(uid), uid)
@@ -1128,7 +1128,7 @@ async def cb_help(cb: CallbackQuery):
 @router.callback_query(F.data == "history")
 async def cb_history(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if not gfeat("history_btn"): await cb.answer("Выключено"); return
     sessions.pop(uid, None)
     await edit(cb, _history_text(uid), other_menu(uid), uid)
@@ -1137,7 +1137,7 @@ async def cb_history(cb: CallbackQuery):
 @router.callback_query(F.data == "templates")
 async def cb_templates(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if not gfeat("templates"): await cb.answer("Выключено"); return
     sessions.pop(uid, None)
     tpls = _templates_list(uid)
@@ -1153,7 +1153,7 @@ async def cb_templates(cb: CallbackQuery):
 @router.callback_query(F.data == "tpl_del_menu")
 async def cb_tpl_del_menu(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     tpls = _templates_list(uid)
     rows = []
     for i, t in enumerate(tpls):
@@ -1165,7 +1165,7 @@ async def cb_tpl_del_menu(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("tpl_del:"))
 async def cb_tpl_del(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     try: idx = int(cb.data.split(":", 1)[1])
     except ValueError: await cb.answer("Ошибка"); return
     tpls = _templates_list(uid)
@@ -1190,7 +1190,7 @@ async def cb_tpl_use(cb: CallbackQuery):
     """Применить шаблон: запускает флоу СБП с предзаполненными name+phone+bank,
     сразу переводит на шаг ввода суммы."""
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if not gfeat("templates"): await cb.answer("Выключено"); return
     try: idx = int(cb.data.split(":", 1)[1])
     except ValueError: await cb.answer("Ошибка"); return
@@ -1215,7 +1215,7 @@ async def cb_tpl_save(cb: CallbackQuery):
     """Сохранить текущие name+phone+bank из сессии СБП как шаблон.
     Не трогает сессию — юзер может сразу нажать «Сгенерировать»."""
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if not gfeat("templates"): await cb.answer("Выключено"); return
     s = sessions.get(uid) or {}
     name = s.get("name"); phone = s.get("phone"); bank = s.get("bank")
@@ -1248,7 +1248,7 @@ async def cb_tpl_save(cb: CallbackQuery):
 @router.callback_query(F.data == "new")
 async def cb_new(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "name", "mid": cb.message.message_id}
     await edit(cb,
         "\U0001f464 <b>Имя получателя</b>\n\n"
@@ -1289,7 +1289,7 @@ def _rand_phone():
 async def cb_fast_gen(cb: CallbackQuery):
     """Быстрая генерация СБП-чека с рандомными параметрами одной кнопкой."""
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if not feat(uid, "fast_gen"): await cb.answer("Фича не выдана", show_alert=True); return
     await cb.answer("⚡ Генерирую…")
     name = random.choice(_FAST_NAMES)
@@ -1330,7 +1330,7 @@ async def cb_fast_gen(cb: CallbackQuery):
 @router.callback_query(F.data == "batch")
 async def cb_batch(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if not feat(uid, "batch"): await cb.answer("Фича не выдана", show_alert=True); return
     sessions[uid] = {"step": "batch_count", "mid": cb.message.message_id}
     await edit(cb, u"\U0001f4e6 <b>Пакет чеков</b>\n\n"
@@ -1380,7 +1380,7 @@ async def _run_batch(msg_or_cb, uid, n):
 @router.callback_query(F.data.startswith("batch_n:"))
 async def cb_batch_n(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if not feat(uid, "batch"): await cb.answer("Фича не выдана", show_alert=True); return
     try: n = int(cb.data.split(":", 1)[1])
     except ValueError: await cb.answer("Ошибка"); return
@@ -1394,7 +1394,7 @@ async def cb_batch_n(cb: CallbackQuery):
 @router.callback_query(F.data == "stats_btn")
 async def cb_stats_btn(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if not feat(uid, "stats"): await cb.answer("Фича не выдана", show_alert=True); return
     sessions.pop(uid, None)
     await edit(cb, _stats_text(uid), other_menu(uid), uid)
@@ -1404,7 +1404,7 @@ async def cb_stats_btn(cb: CallbackQuery):
 @router.callback_query(F.data == "dark_theme")
 async def cb_dark_theme(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if not feat(uid, "dark_theme"): await cb.answer("Фича не выдана", show_alert=True); return
     cur = _fflags(uid).get("dark_theme_on", False)
     _ff_pref_set(uid, "dark_theme_on", not cur)
@@ -1417,7 +1417,7 @@ async def cb_dark_theme(cb: CallbackQuery):
 @router.callback_query(F.data == "notifications")
 async def cb_notifications(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if not feat(uid, "notifications"): await cb.answer("Фича не выдана", show_alert=True); return
     cur = _fflags(uid).get("notifications_on", True)
     _ff_pref_set(uid, "notifications_on", not cur)
@@ -1431,7 +1431,7 @@ async def cb_notifications(cb: CallbackQuery):
 @router.callback_query(F.data == "api_token")
 async def cb_api_token(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if not feat(uid, "api_token"): await cb.answer("Фича не выдана", show_alert=True); return
     token = _fflags(uid).get("api_token_value")
     if not token:
@@ -1448,7 +1448,7 @@ async def cb_api_token(cb: CallbackQuery):
 @router.callback_query(F.data == "api_token_new")
 async def cb_api_token_new(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if not feat(uid, "api_token"): await cb.answer("Фича не выдана", show_alert=True); return
     token = "mts_" + uuid.uuid4().hex[:24]
     _ff_pref_set(uid, "api_token_value", token)
@@ -1462,7 +1462,7 @@ async def cb_again_params(cb: CallbackQuery):
     """«🔄 С другими параметрами» — запускает флоу с предзаполненными данными
     последнего чека. Пользователь меняет только то, что нужно (сумму/счёт/имя)."""
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     flow = cb.data.split(":", 1)[1]
     last = _get_last_params(uid)
     if not last or last.get("flow") != flow:
@@ -1519,7 +1519,7 @@ async def cb_again_params(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("bank:"))
 async def cb_bank(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid]["step"] != "bank":
         await cb.answer("Начни заново"); return
     sessions[uid]["bank"] = cb.data.split(":",1)[1]
@@ -1533,7 +1533,7 @@ async def cb_bank(cb: CallbackQuery):
 @router.callback_query(F.data == "bank_custom")
 async def cb_bank_custom(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid]["step"] != "bank":
         await cb.answer("Начни заново"); return
     sessions[uid]["step"] = "bank_input"
@@ -1548,7 +1548,7 @@ async def cb_ft_yes(cb: CallbackQuery):
     """Юзер подтвердил распознанные данные. Заполняем сессию и переходим
     к первому незаполненному шагу: name → phone → bank → amount → account."""
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     s = sessions.get(uid)
     if not s or s.get("step") != "name" or not s.get("_ft"):
         await cb.answer("Начни заново"); return
@@ -1613,7 +1613,7 @@ async def cb_ft_yes(cb: CallbackQuery):
 async def cb_ft_no(cb: CallbackQuery):
     """Юзер отклонил распознанное — возвращаем к ручному вводу имени."""
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     s = sessions.get(uid)
     if not s:
         await cb.answer("Начни заново"); return
@@ -1627,7 +1627,7 @@ async def cb_ft_no(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("acc:"))
 async def cb_acc(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid]["step"] != "account":
         await cb.answer("Начни заново"); return
     sessions[uid]["acc4"] = cb.data.split(":",1)[1]
@@ -1651,7 +1651,7 @@ async def cb_acc(cb: CallbackQuery):
 @router.callback_query(F.data == "confirm")
 async def cb_confirm(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid]["step"] != "confirm":
         await cb.answer("Начни заново"); return
     sessions[uid]["step"] = "gen_busy"  # анти-двойной тап: повторное нажатие во время генерации
@@ -1711,7 +1711,7 @@ def rand4():
 @router.callback_query(F.data == "new_card")
 async def cb_new_card(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "card_form", "mode": "card", "mid": cb.message.message_id}
     await edit(cb,
         "\U0001f4b3 <b>Перевод по карте</b>\n\n"
@@ -1725,7 +1725,7 @@ async def cb_new_card(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("cform:"))
 async def cb_card_form(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "card_form":
         await cb.answer("Начни заново"); return
     form = cb.data.split(":", 1)[1]
@@ -1754,7 +1754,7 @@ async def cb_card_form(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("cpanf:"))
 async def cb_pan_from(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "card_pan_from":
         await cb.answer("Начни заново"); return
     sessions[uid]["pan_from"] = cb.data.split(":", 1)[1]
@@ -1772,7 +1772,7 @@ async def cb_pan_from(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("cpant:"))
 async def cb_pan_to(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "card_pan_to":
         await cb.answer("Начни заново"); return
     sessions[uid]["pan_to"] = cb.data.split(":", 1)[1]
@@ -1787,7 +1787,7 @@ async def cb_pan_to(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("cfrom:"))
 async def cb_card_from(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "card_from":
         await cb.answer("Начни заново"); return
     sessions[uid]["card_from"] = cb.data.split(":", 1)[1]
@@ -1804,7 +1804,7 @@ async def cb_card_from(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("cto:"))
 async def cb_card_to(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "card_to":
         await cb.answer("Начни заново"); return
     sessions[uid]["card_to"] = cb.data.split(":", 1)[1]
@@ -1819,7 +1819,7 @@ async def cb_card_to(cb: CallbackQuery):
 @router.callback_query(F.data == "card_confirm")
 async def cb_card_confirm(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "card_confirm":
         await cb.answer("Начни заново"); return
     sessions[uid]["step"] = "gen_busy"  # анти-двойной тап
@@ -1955,7 +1955,7 @@ async def _lk_bind_prompt(ev, uid, gen_id=None):
 async def cb_lk_bind(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа"); return
+        await cb.answer(); return
     await cb.answer()  # мгновенный ack: список логинов тянется из API до 15 с
     await _lk_bind_prompt(cb, uid)
 
@@ -2059,7 +2059,7 @@ async def cb_lk_busy(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("lk_add:"))
 async def cb_lk_add(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     gen_id = cb.data.split(":", 1)[1]
     p = lk_pendings.get(gen_id)
     if not p or p.get("uid") != uid:
@@ -2227,7 +2227,7 @@ async def _wb_finish(msg_or_cb, uid):
 @router.callback_query(F.data == "new_wb")
 async def cb_new_wb(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "wb_name", "mid": cb.message.message_id}
     await edit(cb,
         "\U0001f9fe <b>Чек ВБ Банка (Wildberries)</b>\n\n"
@@ -2240,7 +2240,7 @@ async def cb_new_wb(cb: CallbackQuery):
 @router.callback_query(F.data == "wb_skip")
 async def cb_wb_skip(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "wb_msg":
         await cb.answer("Начни заново"); return
     sessions[uid]["wb_msg"] = ""
@@ -2359,7 +2359,7 @@ async def _vtb_card_finish(msg_or_cb, uid):
 @router.callback_query(F.data == "new_vtbcard")
 async def cb_new_vtbcard(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "vtbcard_payer", "mid": cb.message.message_id}
     await edit(cb,
         "\U0001f4b3 <b>Чек ВТБ (перевод на карту)</b>\n"
@@ -2374,7 +2374,7 @@ async def cb_new_vtbcard(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("vtbcard_from:"))
 async def cb_vtbcard_from(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "vtbcard_card_from":
         await cb.answer("Начни заново"); return
     sessions[uid]["vc_card_from"] = cb.data.split(":", 1)[1]
@@ -2393,7 +2393,7 @@ async def cb_vtbcard_from(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("vtbcard_to:"))
 async def cb_vtbcard_to(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "vtbcard_card_to":
         await cb.answer("Начни заново"); return
     sessions[uid]["vc_card_to"] = cb.data.split(":", 1)[1]
@@ -2423,7 +2423,7 @@ async def cb_vtbcard_to(cb: CallbackQuery):
 @router.callback_query(F.data == "vtbcard_banklist")
 async def cb_vtbcard_banklist(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") not in ("vtbcard_amount", "vtbcard_bank"):
         await cb.answer("Начни заново"); return
     sessions[uid]["step"] = "vtbcard_bank"
@@ -2440,7 +2440,7 @@ async def cb_vtbcard_banklist(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("vtbcard_bank:"))
 async def cb_vtbcard_bank(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "vtbcard_bank":
         await cb.answer("Начни заново"); return
     sessions[uid]["vc_bank"] = cb.data.split(":", 1)[1]
@@ -2462,7 +2462,7 @@ async def cb_vtbcard_bank(cb: CallbackQuery):
 @router.callback_query(F.data == "vtbcard_bank_custom")
 async def cb_vtbcard_bank_custom(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "vtbcard_bank":
         await cb.answer("Начни заново"); return
     sessions[uid]["step"] = "vtbcard_bank_input"
@@ -2476,7 +2476,7 @@ async def cb_vtbcard_bank_custom(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("vtbcard_acc:"))
 async def cb_vtbcard_acc(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "vtbcard_account":
         await cb.answer("Начни заново"); return
     digits = cb.data.split(":", 1)[1]
@@ -2492,7 +2492,7 @@ async def cb_vtbcard_acc(cb: CallbackQuery):
 async def cb_ck_rocket_new(cb: CallbackQuery):
     """Вход в режим Чек: выбор СБП / Карта — как переключатель в DocumentsPage."""
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "rk_chek_layout", "mid": cb.message.message_id}
     await edit(cb,
         "\U0001f680 <b>Рокетбанк — Чек</b>\n\nВыбери тип:",
@@ -2504,7 +2504,7 @@ async def cb_ck_rocket_new(cb: CallbackQuery):
 @router.callback_query(F.data == "ck_rocket_sbp")
 async def cb_ck_rocket_sbp(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "ck_rocket_sbp_name", "mid": cb.message.message_id, "ck_flow": "ck_rocket_sbp"}
     await edit(cb,
         "\U0001f680 <b>Чек Рокет — СБП</b>\n\n"
@@ -2516,7 +2516,7 @@ async def cb_ck_rocket_sbp(cb: CallbackQuery):
 @router.callback_query(F.data == "ck_rocket_card")
 async def cb_ck_rocket_card(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "ck_rocket_card_name", "mid": cb.message.message_id, "ck_flow": "ck_rocket_card"}
     await edit(cb,
         "\U0001f680 <b>Чек Рокет — По карте</b>\n\n"
@@ -2591,7 +2591,7 @@ _CK_PAYERS = ["Александр Евгеньевич Ж.", "Денис Вик�
 @router.callback_query(F.data == "ck_alfa_sbp")
 async def cb_ck_alfa_sbp(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "ck_alfa_name", "mid": cb.message.message_id}
     await edit(cb,
         "\U0001f7e6 <b>Чек Альфа-Банк (СБП)</b> — движок чекетоп\n\n"
@@ -2605,7 +2605,7 @@ async def cb_ck_alfa_sbp(cb: CallbackQuery):
 @router.callback_query(F.data == "ck_tbank_sbp")
 async def cb_ck_tbank_sbp(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "ck_tbank_name", "mid": cb.message.message_id}
     await edit(cb,
         "\U0001f7e8 <b>Чек Т-Банк (СБП)</b> — движок чекетоп\n\n"
@@ -2619,7 +2619,7 @@ async def cb_ck_tbank_sbp(cb: CallbackQuery):
 @router.callback_query(F.data == "ck_vtb_sbp")
 async def cb_ck_vtb_sbp(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "ck_vtb_name", "mid": cb.message.message_id}
     await edit(cb,
         "\U0001f535 <b>Чек ВТБ (СБП)</b> — движок чекетоп\n\n"
@@ -2706,7 +2706,7 @@ async def _ck_finish(msg_or_cb, uid):
 @router.callback_query(F.data == "new_vtb")
 async def cb_new_vtb(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "vtb_name", "mid": cb.message.message_id}
     await edit(cb,
         "\U0001f9fe <b>Чек ВТБ (СБП)</b>\n"
@@ -2721,7 +2721,7 @@ async def cb_new_vtb(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("vtb_bank:"))
 async def cb_vtb_bank(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "vtb_bank":
         await cb.answer("Начни заново"); return
     bank = cb.data.split(":", 1)[1]
@@ -2739,7 +2739,7 @@ async def cb_vtb_bank(cb: CallbackQuery):
 @router.callback_query(F.data == "vtb_bank_custom")
 async def cb_vtb_bank_custom(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "vtb_bank":
         await cb.answer("Начни заново"); return
     sessions[uid]["step"] = "vtb_bank_input"
@@ -2753,7 +2753,7 @@ async def cb_vtb_bank_custom(cb: CallbackQuery):
 @router.callback_query(F.data == "vtb_payer_auto")
 async def cb_vtb_payer_auto(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "vtb_payer":
         await cb.answer("Начни заново"); return
     s = sessions[uid]
@@ -2771,7 +2771,7 @@ async def cb_vtb_payer_auto(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("vtb_acc:"))
 async def cb_vtb_acc(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "vtb_account":
         await cb.answer("Начни заново"); return
     digits = cb.data.split(":", 1)[1]
@@ -2833,7 +2833,7 @@ async def _rshb_finish(msg_or_cb, uid):
 @router.callback_query(F.data == "new_rshb")
 async def cb_new_rshb(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "rshb_name", "mid": cb.message.message_id}
     await edit(cb,
         "\U0001f9fe <b>Чек РСХБ (СБП)</b>\n"
@@ -2848,7 +2848,7 @@ async def cb_new_rshb(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("rshb_bank:"))
 async def cb_rshb_bank(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "rshb_bank":
         await cb.answer("Начни заново"); return
     bank = cb.data.split(":", 1)[1]
@@ -2864,7 +2864,7 @@ async def cb_rshb_bank(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("rshb_acc:"))
 async def cb_rshb_acc(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "rshb_account":
         await cb.answer("Начни заново"); return
     digits = cb.data.split(":", 1)[1]
@@ -3065,7 +3065,7 @@ async def _ozon_v2_edit_start(cb: CallbackQuery, uid):
 async def cb_ozon_v2(cb: CallbackQuery):
     """Диспетчер Ozon v2 (namespace oz: ядра ozon_ux)."""
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if not _ozon_v2_enabled(uid):
         await cb.answer("Фича не выдана", show_alert=True); return
     action, arg = ozx.parse_callback(cb.data)
@@ -3163,7 +3163,7 @@ async def cb_ozon_edit(cb: CallbackQuery):
     PDF байт-в-байт нетронутым. См. ozon_editor.edit_amount. Только так ID
     операции остаётся настоящим и проходит сверку с БД Озон Банка."""
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if _ozon_v2_enabled(uid):
         await _ozon_v2_edit_start(cb, uid)
         await cb.answer(); return
@@ -3181,7 +3181,7 @@ async def cb_ozon_edit(cb: CallbackQuery):
 @router.callback_query(F.data == "new_ozon")
 async def cb_new_ozon(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "ozon_name", "mid": cb.message.message_id}
     await edit(cb,
         "\U0001f9fe <b>Чек Озон Банк (СБП)</b>\n\n"
@@ -3199,7 +3199,7 @@ async def cb_new_ozon(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("ozon_bank:"))
 async def cb_ozon_bank(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     # Ozon v2: тот же список банков, но банк пишется в Draft (ozon_ux),
     # а не в s["ozon_bank"], и следующий шаг берётся из ядра.
     _s = sessions.get(uid) or {}
@@ -3232,7 +3232,7 @@ async def cb_ozon_bank(cb: CallbackQuery):
 @router.callback_query(F.data == "ozon_bank_custom")
 async def cb_ozon_bank_custom(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     # Ozon v2: шаг сессии остаётся ozon_flow, текст заберёт Draft.
     _s = sessions.get(uid) or {}
     if _s.get("step") == "ozon_flow" and ozx is not None:
@@ -3420,7 +3420,7 @@ async def _yrcpt_finish(cb: CallbackQuery, uid):
 @router.callback_query(F.data == "new_yrcpt")
 async def cb_new_yrcpt(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "yrcpt_sender", "mid": cb.message.message_id}
     await edit(cb,
         "\U0001f7e1 <b>Квитанция СБП Яндекс Банка</b>\n\n"
@@ -3434,7 +3434,7 @@ async def cb_new_yrcpt(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("yrcpt_bank:"))
 async def cb_yrcpt_bank(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "yrcpt_bank":
         await cb.answer("Начни заново"); return
     bank = cb.data.split(":", 1)[1]
@@ -3455,7 +3455,7 @@ async def cb_yrcpt_bank(cb: CallbackQuery):
 @router.callback_query(F.data == "yrcpt_bank_custom")
 async def cb_yrcpt_bank_custom(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "yrcpt_bank":
         await cb.answer("Начни заново"); return
     sessions[uid]["step"] = "yrcpt_bank_input"
@@ -3469,7 +3469,7 @@ async def cb_yrcpt_bank_custom(cb: CallbackQuery):
 @router.callback_query(F.data == "yrcpt_msg_skip")
 async def cb_yrcpt_msg_skip(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "yrcpt_message":
         await cb.answer("Начни заново"); return
     sessions[uid]["yrcpt_message"] = ""
@@ -3481,7 +3481,7 @@ async def cb_yrcpt_msg_skip(cb: CallbackQuery):
 @router.callback_query(F.data == "yrcpt_go")
 async def cb_yrcpt_go(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "yrcpt_preview":
         await cb.answer("Начни заново", show_alert=True); return
     await cb.answer()
@@ -3491,7 +3491,7 @@ async def cb_yrcpt_go(cb: CallbackQuery):
 @router.callback_query(F.data == "new_yandex")
 async def cb_new_yandex(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "yandex_name", "mid": cb.message.message_id}
     await edit(cb,
         u"\U0001f4c4 <b>Выписка Яндекс Банк</b> (договор «Счёт ЭДС»)\n"
@@ -3506,7 +3506,7 @@ async def cb_new_yandex(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("yandex_bank:"))
 async def cb_yandex_bank(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "yandex_bank":
         await cb.answer("Начни заново"); return
     bank = cb.data.split(":", 1)[1]
@@ -3522,7 +3522,7 @@ async def cb_yandex_bank(cb: CallbackQuery):
 @router.callback_query(F.data == "yandex_bank_custom")
 async def cb_yandex_bank_custom(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "yandex_bank":
         await cb.answer("Начни заново"); return
     sessions[uid]["step"] = "yandex_bank_input"
@@ -3536,7 +3536,7 @@ async def cb_yandex_bank_custom(cb: CallbackQuery):
 @router.callback_query(F.data == "new_stmt")
 async def cb_new_stmt(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "st_name", "mode": "stmt", "mid": cb.message.message_id}
     await edit(cb,
         "\U0001f4c4 <b>Выписка \"ЭКСИ-БАНК\" (АО)</b>\n\n"
@@ -3549,7 +3549,7 @@ async def cb_new_stmt(cb: CallbackQuery):
 @router.callback_query(F.data == "stmt_noholds")
 async def cb_stmt_noholds(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "st_holds":
         await cb.answer("Начни заново"); return
     sessions[uid]["holds"] = []
@@ -3559,7 +3559,7 @@ async def cb_stmt_noholds(cb: CallbackQuery):
 @router.callback_query(F.data == "stmt_confirm")
 async def cb_stmt_confirm(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     if uid not in sessions or sessions[uid].get("step") != "st_confirm":
         await cb.answer("Начни заново"); return
     sessions[uid]["step"] = "gen_busy"  # анти-двойной тап
@@ -5313,7 +5313,7 @@ _SUBSET_RE = re.compile(rb"/BaseFont\s*/([A-Z]{6})\+([A-Za-z0-9\-]+)")
 async def cb_check_pdf(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа", show_alert=True); return
+        await cb.answer(); return
     if not feat(uid, "check_pdf"):
         await cb.answer("Фича не выдана админом", show_alert=True); return
     sessions[uid] = {"step": "check_pdf_wait", "mid": cb.message.message_id}
@@ -5879,7 +5879,7 @@ async def cb_usr_create(cb: CallbackQuery):
 async def cb_bank_menu(cb: CallbackQuery):
     """Подменю банка из главного меню (навигация, flow не стартует)."""
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     bank_key = cb.data.split(":", 1)[1] if ":" in cb.data else ""
     if bank_key not in _BANK_MENU_BUTTONS:
         await cb.answer("Неизвестный банк"); return
@@ -5891,7 +5891,7 @@ async def cb_bank_menu(cb: CallbackQuery):
 async def cb_menu_other(cb: CallbackQuery):
     """Раздел «Другое»: все небанковские кнопки (feature-гейты — в other_menu)."""
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions.pop(uid, None)
     await edit(cb, OTHER_MENU_TEXT, other_menu(uid), uid)
     await cb.answer()
@@ -6024,7 +6024,7 @@ async def cb_a_bind_del(cb: CallbackQuery):
 @router.callback_query(F.data == "rk_bank_auto")
 async def cb_rk_bank_auto(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     s = sessions.get(uid)
     if not s: await cb.answer("Начни заново"); return
     bank = random.choice(["Сбербанк", "Т-Банк", "Альфа-Банк", "ВТБ", "Озон Банк"])
@@ -6040,7 +6040,7 @@ async def cb_rk_bank_auto(cb: CallbackQuery):
 @router.callback_query(F.data.startswith("rk_card:"))
 async def cb_rk_card(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     s = sessions.get(uid)
     if not s: await cb.answer("Начни заново"); return
     digits = cb.data.split(":", 1)[1]
@@ -6091,7 +6091,7 @@ def _rk_stmt_ops_text(s: dict) -> str:
 @router.callback_query(F.data == "ck_rocket_stmt")
 async def cb_ck_rocket_stmt(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     sessions[uid] = {"step": "rk_stmt_name", "mid": cb.message.message_id, "rk_stmt_ops": []}
     await edit(cb,
         "\U0001f680 <b>Выписка Рокетбанк</b>\n\n"
@@ -6104,7 +6104,7 @@ async def cb_ck_rocket_stmt(cb: CallbackQuery):
 @router.callback_query(F.data.in_({"rk_stmt_add_in", "rk_stmt_add_out"}))
 async def cb_rk_stmt_add_op(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     s = sessions.get(uid)
     if not s: await cb.answer("Начни заново"); return
     direction = "INCOME" if cb.data == "rk_stmt_add_in" else "OUTCOME"
@@ -6121,7 +6121,7 @@ async def cb_rk_stmt_add_op(cb: CallbackQuery):
 @router.callback_query(F.data == "rk_stmt_del_last")
 async def cb_rk_stmt_del_last(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     s = sessions.get(uid)
     if not s: await cb.answer("Начни заново"); return
     ops = s.get("rk_stmt_ops", [])
@@ -6134,7 +6134,7 @@ async def cb_rk_stmt_del_last(cb: CallbackQuery):
 @router.callback_query(F.data == "rk_stmt_done")
 async def cb_rk_stmt_done(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     s = sessions.get(uid)
     if not s: await cb.answer("Начни заново"); return
     if not s.get("rk_stmt_ops"):
@@ -6210,7 +6210,7 @@ def _finish_op(s: dict, phone: str = ""):
 @router.callback_query(F.data == "rk_stmt_bal_auto")
 async def cb_rk_stmt_bal_auto(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     s = sessions.get(uid)
     if not s: await cb.answer("Начни заново"); return
     bal = random.randint(5000, 50000)
@@ -6224,7 +6224,7 @@ async def cb_rk_stmt_bal_auto(cb: CallbackQuery):
 @router.callback_query(F.data == "rk_stmt_op_now")
 async def cb_rk_stmt_op_now(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     s = sessions.get(uid)
     if not s: await cb.answer("Начни заново"); return
     from datetime import datetime as _dt, timezone as _tz, timedelta as _td
@@ -6244,7 +6244,7 @@ async def cb_rk_stmt_op_now(cb: CallbackQuery):
 @router.callback_query(F.data == "rk_stmt_op_phone_auto")
 async def cb_rk_stmt_op_phone_auto(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     s = sessions.get(uid)
     if not s: await cb.answer("Начни заново"); return
     ph = f"+7 9{random.randint(10,99)} {random.randint(100,999)}-{random.randint(10,99)}-{random.randint(10,99)}"
@@ -6257,7 +6257,7 @@ async def cb_rk_stmt_op_phone_auto(cb: CallbackQuery):
 @router.callback_query(F.data == "rk_chek_dt_now")
 async def cb_rk_chek_dt_now(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     s = sessions.get(uid)
     if not s: await cb.answer("Начни заново"); return
     from datetime import datetime as _dt, timezone as _tz, timedelta as _td
@@ -6282,7 +6282,7 @@ async def cb_rk_chek_dt_now(cb: CallbackQuery):
 @router.callback_query(F.data == "rk_chek_sph_auto")
 async def cb_rk_chek_sph_auto(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     s = sessions.get(uid)
     if not s: await cb.answer("Начни заново"); return
     s["rk_sender_phone"] = f"+7 9{random.randint(10,99)} {random.randint(100,999)}-{random.randint(10,99)}-{random.randint(10,99)}"
@@ -6297,7 +6297,7 @@ async def cb_rk_chek_sph_auto(cb: CallbackQuery):
 @router.callback_query(F.data == "rk_chek_rph_auto")
 async def cb_rk_chek_rph_auto(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     s = sessions.get(uid)
     if not s: await cb.answer("Начни заново"); return
     s["rk_recip_phone"] = f"+7 9{random.randint(10,99)} {random.randint(100,999)}-{random.randint(10,99)}-{random.randint(10,99)}"
@@ -6312,7 +6312,7 @@ async def cb_rk_chek_rph_auto(cb: CallbackQuery):
 @router.callback_query(F.data == "rk_card_nobank")
 async def cb_rk_card_nobank(cb: CallbackQuery):
     uid = cb.from_user.id
-    if not is_ok(uid): await cb.answer("Нет доступа"); return
+    if not is_ok(uid): await cb.answer(); return
     s = sessions.get(uid)
     if not s: await cb.answer("Начни заново"); return
     s["rk_card_bank"] = None
@@ -6919,7 +6919,7 @@ def _rk2_save_memory(uid):
 async def cb_rk2_menu(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     rows = _rk2_rows2([
         ("💸 Перевод по СБП", "rocket:sbp"),
@@ -6936,7 +6936,7 @@ async def cb_rk2_menu(cb: CallbackQuery):
 async def cb_rk2_sbp_start(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     sessions[uid] = {"step": "rk2_rcpt_name", "rk2_scenario": "rocket_sbp", "rk2_hist": [], "rk2_uid": uid, "mid": cb.message.message_id}
     await _rk2_show(cb, uid, "rk2_rcpt_name")
@@ -6947,7 +6947,7 @@ async def cb_rk2_sbp_start(cb: CallbackQuery):
 async def cb_rk2_card_start(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     sessions[uid] = {"step": "rk2_rcpt_card", "rk2_scenario": "rocket_card", "rk2_hist": [], "rk2_uid": uid, "mid": cb.message.message_id}
     await _rk2_show(cb, uid, "rk2_rcpt_card")
@@ -6958,7 +6958,7 @@ async def cb_rk2_card_start(cb: CallbackQuery):
 async def cb_rk2_stmt_start(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     sessions[uid] = {"step": "rk2s_period", "rk2_scenario": "rocket_statement", "rk2_hist": [], "rk2_uid": uid,
                      "rk2s_receipt_paths": [], "rk2s_receipt_dates": [], "rk2s_fill_random": True,
@@ -6972,7 +6972,7 @@ async def cb_rk2_stmt_start(cb: CallbackQuery):
 async def cb_rk2_back(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     await _rk2_back(cb, uid)
     await cb.answer()
@@ -6982,7 +6982,7 @@ async def cb_rk2_back(cb: CallbackQuery):
 async def cb_rk2_mem_recipient(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7009,7 +7009,7 @@ async def cb_rk2_mem_recipient(cb: CallbackQuery):
 async def cb_rk2_mem_sender(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7027,7 +7027,7 @@ async def cb_rk2_mem_sender(cb: CallbackQuery):
 async def cb_rk2_bank(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7051,7 +7051,7 @@ async def cb_rk2_bank(cb: CallbackQuery):
 async def cb_rk2_sender_acc(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7075,7 +7075,7 @@ async def cb_rk2_sender_acc(cb: CallbackQuery):
 async def cb_rk2_time(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7094,7 +7094,7 @@ async def cb_rk2_time(cb: CallbackQuery):
 async def cb_rk2_edit(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7122,7 +7122,7 @@ async def cb_rk2_edit(cb: CallbackQuery):
 async def cb_rk2_edit_field(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7145,7 +7145,7 @@ async def cb_rk2_edit_field(cb: CallbackQuery):
 async def cb_rk2_generate(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7220,7 +7220,7 @@ async def _rk2_do_generate(ev, uid):
 async def cb_rk2s_issue(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7239,7 +7239,7 @@ async def cb_rk2s_issue(cb: CallbackQuery):
 async def cb_rk2s_acc(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7268,7 +7268,7 @@ async def cb_rk2s_acc(cb: CallbackQuery):
 async def cb_rk2s_count(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7317,7 +7317,7 @@ async def _rk2s_after_count(ev, uid):
 async def cb_rk2s_source(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7344,7 +7344,7 @@ async def cb_rk2s_source(cb: CallbackQuery):
 async def cb_rk2s_uploads_done(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7365,7 +7365,7 @@ async def cb_rk2s_uploads_done(cb: CallbackQuery):
 async def cb_rk2s_period_fix(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7390,7 +7390,7 @@ async def cb_rk2s_period_fix(cb: CallbackQuery):
 async def cb_rk2s_fill_random(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7405,7 +7405,7 @@ async def cb_rk2s_fill_random(cb: CallbackQuery):
 async def cb_rk2s_reduce(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7422,7 +7422,7 @@ async def cb_rk2s_reduce(cb: CallbackQuery):
 async def cb_rk2s_day_receipt(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7442,7 +7442,7 @@ async def cb_rk2s_day_receipt(cb: CallbackQuery):
 async def cb_rk2s_day_choose(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     await _rk2_show(cb, uid, "rk2s_op_date")
     await cb.answer()
@@ -7452,7 +7452,7 @@ async def cb_rk2s_day_choose(cb: CallbackQuery):
 async def cb_rk2s_ops(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7475,7 +7475,7 @@ async def cb_rk2s_ops(cb: CallbackQuery):
 async def cb_rk2s_op_kind(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7490,7 +7490,7 @@ async def cb_rk2s_op_kind(cb: CallbackQuery):
 async def cb_rk2s_op_dt(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7510,7 +7510,7 @@ async def cb_rk2s_op_dt(cb: CallbackQuery):
 async def cb_rk2s_op_detail(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7546,7 +7546,7 @@ def _rk2s_finish_op(s: dict):
 async def cb_rk2s_op_delete(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7564,7 +7564,7 @@ async def cb_rk2s_op_delete(cb: CallbackQuery):
 async def cb_rk2s_edit(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7594,7 +7594,7 @@ async def cb_rk2s_edit(cb: CallbackQuery):
 async def cb_rk2s_edit_field(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
@@ -7611,7 +7611,7 @@ async def cb_rk2s_edit_field(cb: CallbackQuery):
 async def cb_rk2s_generate(cb: CallbackQuery):
     uid = cb.from_user.id
     if not is_ok(uid):
-        await cb.answer("Нет доступа")
+        await cb.answer()
         return
     s = sessions.get(uid)
     if not s:
